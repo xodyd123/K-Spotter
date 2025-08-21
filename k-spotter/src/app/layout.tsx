@@ -1,6 +1,7 @@
 // app/layout.tsx
 
 import KakaoSDK from "./components/kakaoSdk";
+import "./globals.css"; 
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
