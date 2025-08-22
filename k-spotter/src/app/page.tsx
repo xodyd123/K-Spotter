@@ -3,6 +3,8 @@
 
 import { useEffect, useRef } from "react";
 import { Place } from "../../type/type";
+import MarkerDetail from "./components/markerDetail";
+import { createRoot, Root } from "react-dom/client";
 
 declare global {
   interface Window {
@@ -10,19 +12,30 @@ declare global {
   }
 }
 
+type CustomOverlayLike = {
+  setMap(map: any | null): void;
+  setPosition(pos: any): void;
+  setContent(content: HTMLElement | string): void;
+  setZIndex(z: number): void;
+};                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+
+
 export default function Page() {
   const mapRef = useRef<HTMLDivElement>(null);
 
   // ✅ 중복 초기화/정리 핸들 보관
   const initializedRef = useRef(false);
   const cleanupRef = useRef<() => void>(() => {});
+  const infoRoot = useRef<Root | null>(null) ;
+  const overlayRef = useRef<CustomOverlayLike | null>(null)
+
 
   useEffect(() => {
     if (!mapRef.current) return;
 
     const init = () => {
       if (!window.kakao?.maps) return;
-      if (initializedRef.current) return;          // ✅ 중복 방지
+      if (initializedRef.current) return; // ✅ 중복 방지
       initializedRef.current = true;
 
       window.kakao.maps.load(async () => {
@@ -32,12 +45,12 @@ export default function Page() {
 
         // 지도 생성
         const map = new kakao.maps.Map(mapRef.current, {
-          center: new kakao.maps.LatLng(37.5665, 126.9780),
+          center: new kakao.maps.LatLng(37.5665, 126.978),
           level: 5,
         });
 
         // ✅ InfoWindow 1개만 재사용
-        const info = new kakao.maps.InfoWindow({ content: "" });
+        // const info = new kakao.maps.InfoWindow({ content: "" }); 
 
         let markers = [];
         const offHandlers: Array<() => void> = [];
@@ -57,10 +70,49 @@ export default function Page() {
             });
 
             const handler = () => {
-              info.setContent(
-                `<div style="padding:6px 10px;">${item.title}</div>`
-              );
-              info.open(map, marker);
+              //  이전 루트 정리
+              if (infoRoot.current) {
+                infoRoot.current.unmount();
+                infoRoot.current = null;
+              } 
+
+
+              const container = document.createElement("div"); 
+              container.className = "marker-overlay"; // CSS용
+
+              // 컨테이너 div 생성
+              // React Root로 MarkerDetail 렌더
+              infoRoot.current = createRoot(container);
+              infoRoot.current.render(
+                <MarkerDetail
+                  item={item}
+                  onClose={() => {
+                    overlayRef.current?.setMap(null);
+                    infoRoot.current?.unmount();
+                    infoRoot.current = null;
+                    
+                  }}
+                />
+              ); 
+
+              // 오버레이 생성 
+              if(!overlayRef.current){
+                overlayRef.current = new kakao.maps.CustomOverlay({
+                  content: container,
+                  position: marker.getPosition(),
+                  xAnchor: 0.5,
+                  yAnchor: 1,
+                  zIndex: 3,
+                  clickable: true, // 오버레이 위 UI 클릭이 지도에 먹히지 않도록
+                });            
+              }
+              else {
+                overlayRef.current.setContent(container);
+                overlayRef.current.setPosition(marker.getPosition());
+                overlayRef.current.setZIndex(3);
+              }
+
+              overlayRef.current?.setMap(map);
             };
 
             kakao.maps.event.addListener(marker, "click", handler);
@@ -83,7 +135,10 @@ export default function Page() {
 
         // ✅ 정리 루틴 등록
         cleanupRef.current = () => {
-          info.close();
+          overlayRef.current?.setMap(null);
+          overlayRef.current = null;
+          infoRoot.current?.unmount();
+          infoRoot.current = null;
           offHandlers.forEach((off) => off());
           markers.forEach((m) => m.setMap(null));
           initializedRef.current = false;
