@@ -29,6 +29,21 @@ export default function Page() {
   const infoRoot = useRef<Root | null>(null) ;
   const overlayRef = useRef<CustomOverlayLike | null>(null)
 
+  const onMapClick = () => {
+    const ov = overlayRef.current;
+    if (!ov) return;  
+    ov?.setMap(null) ;  
+    infoRoot.current?.unmount() ;
+    ov?.setContent(''); 
+    infoRoot.current = null;         
+    
+  }
+
+  const onKey = (e : KeyboardEvent)=> {
+    if (e.key === 'Escape') onMapClick();
+
+
+ }
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -54,6 +69,12 @@ export default function Page() {
 
         let markers = [];
         const offHandlers: Array<() => void> = [];
+        
+
+
+
+
+        kakao.maps.event.addListener(map , "click" , onMapClick)
 
         try {
           const res = await fetch("/api/places");
@@ -66,7 +87,9 @@ export default function Page() {
             const marker = new kakao.maps.Marker({
               position: new kakao.maps.LatLng(item.lat, item.lng),
               map,
-              title: item.title,
+              title: item.title, 
+              category : item.category , 
+
             });
 
             const handler = () => {
@@ -86,12 +109,7 @@ export default function Page() {
               infoRoot.current.render(
                 <MarkerDetail
                   item={item}
-                  onClose={() => {
-                    overlayRef.current?.setMap(null);
-                    infoRoot.current?.unmount();
-                    infoRoot.current = null;
-                    
-                  }}
+                  onClose={onMapClick }
                 />
               ); 
 
@@ -115,7 +133,9 @@ export default function Page() {
               overlayRef.current?.setMap(map);
             };
 
+
             kakao.maps.event.addListener(marker, "click", handler);
+        
             offHandlers.push(() =>
               kakao.maps.event.removeListener(marker, "click", handler)
             );
@@ -141,7 +161,9 @@ export default function Page() {
           infoRoot.current = null;
           offHandlers.forEach((off) => off());
           markers.forEach((m) => m.setMap(null));
-          initializedRef.current = false;
+          initializedRef.current = false; 
+          kakao.maps.event.removeListener(map, "click",  onMapClick)
+
         };
       });
     };
@@ -151,12 +173,18 @@ export default function Page() {
 
     // 2) 커스텀 로드 이벤트 대기(사용 중이라면)
     const onLoaded = () => init();
+
     window.addEventListener("kakao:loaded", onLoaded);
+    window.addEventListener("keydown" , onKey) ;
+   
+  
 
     return () => {
-      window.removeEventListener("kakao:loaded", onLoaded);
+      window.removeEventListener("kakao:loaded", onLoaded);  
+      window.removeEventListener("keydown" , onKey) ;
       cleanupRef.current?.(); // ✅ 누수 방지
-    };
+    
+    }
   }, []);
 
   return <div ref={mapRef} className="w-full h-screen" />;

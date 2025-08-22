@@ -10,11 +10,11 @@ export interface Place {
 
 export enum category{
 
-    DRAMA = "드라마 촬영지" ,
+    DRAMA = "Drama" ,
 
-    MOVIE = "영화 촬영지" , 
+    MOVIE = "Movie" , 
     
-    MUSIC = "뮤직비디오 촬영지"
+    MUSIC = "MusicVideo"
 
 }
 
