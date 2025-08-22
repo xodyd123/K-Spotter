@@ -71,10 +71,9 @@ export default function Page() {
         const offHandlers: Array<() => void> = [];
         
 
-
-
-
         kakao.maps.event.addListener(map , "click" , onMapClick)
+        kakao.maps.event.addListener(map, 'dragstart', onMapClick);
+        kakao.maps.event.addListener(map, 'zoom_changed', onMapClick);  
 
         try {
           const res = await fetch("/api/places");
@@ -162,7 +161,9 @@ export default function Page() {
           offHandlers.forEach((off) => off());
           markers.forEach((m) => m.setMap(null));
           initializedRef.current = false; 
-          kakao.maps.event.removeListener(map, "click",  onMapClick)
+          kakao.maps.event.removeListener(map, "click",  onMapClick);
+          kakao.maps.event.removeListener(map, 'dragstart', onMapClick);
+          kakao.maps.event.removeListener(map, 'zoom_changed', onMapClick);  
 
         };
       });
