@@ -10,25 +10,32 @@ export default function MarkerDetail({
   onClose: () => void;
 }) {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
-  const [error, setError] = useState<any>(null);
+  const [loading , setLoading] = useState<boolean>(false)
+  const [error, setError] = useState<boolean>(false);
+
 
   useEffect(() => {
       const ac = new AbortController();
+      setLoading(true) ;
+      setError(false);      // 기존 에러 상태 리셋
+      setImgUrl(null);      // 이전 이미지 숨기고 스켈레톤 노출
     (async () => {
       try {
+        
         const r = await fetch(
           `/api/images?keyword=${encodeURIComponent(item.title)}`,
-          { signal: ac.signal }
+          { signal: ac.signal } 
+        
         );
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json();
-        console.log(j);
         const raw = j?.response?.body?.items?.item;
 
         const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
         setImgUrl(items[0]?.galWebImageUrl ?? null);
+       
       } catch (e) {
-        if ((e as any).name !== "AbortError") setError(e);
+        if ((e as any).name !== "AbortError") setError(true);
       }
     })();
     return () => ac.abort();
@@ -37,12 +44,19 @@ export default function MarkerDetail({
   return (
     <div className="w-[260px] overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-black/5">
       <div className="flex gap-3 p-3">
-        {imgUrl && (
+        {imgUrl && !error ?(
+
           <img
             src={imgUrl}
-            alt=""
+            alt={item.title}
+            onLoad={() => setLoading(false)}
+            onError={() => { setError(true); setLoading(false); }}
             className="h-28 w-28 shrink-0 rounded-lg object-cover pointer-events-none select-none"
           />
+        ) : (
+          <div className="h-28 w-28 rounded-lg bg-gray-200 grid place-items-center text-xs text-gray-500">{
+            error ? `이미지 불가` : `이미지 없음`
+          } </div>
         )}
 
         <div className="flex min-w-0 flex-col">
