@@ -40,7 +40,10 @@ export default function Page() {
   }
 
   const onKey = (e : KeyboardEvent)=> {
-    if (e.key === 'Escape') onMapClick();
+
+    const el = document.activeElement as HTMLElement | null ; 
+    const typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+    if (e.key === 'Escape' && !typing) onMapClick();
 
 
  }
