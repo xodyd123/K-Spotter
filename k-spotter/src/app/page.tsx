@@ -29,6 +29,13 @@ export default function Page() {
   const overlayRef = useRef<CustomOverlayLike | null>(null);
   const [boundsText, setBoundsText] = useState<string>("");
   const idleId = useRef<number | null>(null);
+  const [isDev, setIsDev] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const query =
+      new URLSearchParams(window.location.search).get("dev") === "1";
+    const fromStore = localStorage.getItem("devhud") === "1";
+    return query || fromStore;
+  });
 
   const onMapClick = () => {
     const ov = overlayRef.current;
@@ -38,16 +45,30 @@ export default function Page() {
     ov?.setContent("");
     infoRoot.current = null;
   };
+  
+  useEffect(()=>{
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing =
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable);
+      if (e.key === "Escape" && !typing) onMapClick();
+      if (e.key.toLowerCase() === "d") {
+        setIsDev(prev => {
+          const next = !prev ; 
+          localStorage.setItem("devhud" , next ? "1" : "0") ;
+          return next; 
+        })
+      }
+    };
 
-  const onKey = (e: KeyboardEvent) => {
-    const el = document.activeElement as HTMLElement | null;
-    const typing =
-      el &&
-      (el.tagName === "INPUT" ||
-        el.tagName === "TEXTAREA" ||
-        el.isContentEditable);
-    if (e.key === "Escape" && !typing) onMapClick();
-  };
+    window.addEventListener("keydown" , onKey) ;
+    return () => window.removeEventListener("keydown" , onKey) ;
+  
+
+  }, [])
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -75,7 +96,6 @@ export default function Page() {
         const offHandlers: Array<() => void> = [];
 
         const onIdle = () => {
-       
           if (idleId.current) {
             clearTimeout(idleId.current);
           }
@@ -84,10 +104,12 @@ export default function Page() {
             const b = map.getBounds();
             const sw = b.getSouthWest();
             const ne = b.getNorthEast();
-            const fmt = (n: number) => n.toFixed(5); 
-            console.log( `${fmt(sw.getLat())}, ${fmt(sw.getLng())} ~ ${fmt(
-              ne.getLat()
-            )}, ${fmt(ne.getLng())}`)
+            const fmt = (n: number) => n.toFixed(5);
+            console.log(
+              `${fmt(sw.getLat())}, ${fmt(sw.getLng())} ~ ${fmt(
+                ne.getLat()
+              )}, ${fmt(ne.getLng())}`
+            );
             setBoundsText(
               `${fmt(sw.getLat())}, ${fmt(sw.getLng())} ~ ${fmt(
                 ne.getLat()
@@ -101,7 +123,7 @@ export default function Page() {
         kakao.maps.event.addListener(map, "zoom_changed", onMapClick);
         kakao.maps.event.addListener(map, "idle", onIdle);
 
-        onIdle();
+        onIdle(); //한번 실행 
 
         try {
           const res = await fetch("/api/places");
@@ -197,11 +219,11 @@ export default function Page() {
     const onLoaded = () => init();
 
     window.addEventListener("kakao:loaded", onLoaded);
-    window.addEventListener("keydown", onKey);
+ 
 
     return () => {
       window.removeEventListener("kakao:loaded", onLoaded);
-      window.removeEventListener("keydown", onKey);
+     
       cleanupRef.current?.(); // ✅ 누수 방지
     };
   }, []);
@@ -209,7 +231,7 @@ export default function Page() {
   return (
     <>
       <div ref={mapRef} className="w-full h-screen" />;
-      {boundsText && (
+      {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
           {boundsText}
         </div>
