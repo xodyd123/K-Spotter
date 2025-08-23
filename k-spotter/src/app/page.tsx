@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Place } from "../../type/type";
 import MarkerDetail from "./components/markerDetail";
 import { createRoot, Root } from "react-dom/client";
@@ -17,8 +17,7 @@ type CustomOverlayLike = {
   setPosition(pos: any): void;
   setContent(content: HTMLElement | string): void;
   setZIndex(z: number): void;
-};                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
-
+};
 
 export default function Page() {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -26,27 +25,29 @@ export default function Page() {
   // ✅ 중복 초기화/정리 핸들 보관
   const initializedRef = useRef(false);
   const cleanupRef = useRef<() => void>(() => {});
-  const infoRoot = useRef<Root | null>(null) ;
-  const overlayRef = useRef<CustomOverlayLike | null>(null)
+  const infoRoot = useRef<Root | null>(null);
+  const overlayRef = useRef<CustomOverlayLike | null>(null);
+  const [boundsText, setBoundsText] = useState<string>("");
+  const idleId = useRef<number | null>(null);
 
   const onMapClick = () => {
     const ov = overlayRef.current;
-    if (!ov) return;  
-    ov?.setMap(null) ;  
-    infoRoot.current?.unmount() ;
-    ov?.setContent(''); 
-    infoRoot.current = null;         
-    
-  }
+    if (!ov) return;
+    ov?.setMap(null);
+    infoRoot.current?.unmount();
+    ov?.setContent("");
+    infoRoot.current = null;
+  };
 
-  const onKey = (e : KeyboardEvent)=> {
-
-    const el = document.activeElement as HTMLElement | null ; 
-    const typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
-    if (e.key === 'Escape' && !typing) onMapClick();
-
-
- }
+  const onKey = (e: KeyboardEvent) => {
+    const el = document.activeElement as HTMLElement | null;
+    const typing =
+      el &&
+      (el.tagName === "INPUT" ||
+        el.tagName === "TEXTAREA" ||
+        el.isContentEditable);
+    if (e.key === "Escape" && !typing) onMapClick();
+  };
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -68,15 +69,39 @@ export default function Page() {
         });
 
         // ✅ InfoWindow 1개만 재사용
-        // const info = new kakao.maps.InfoWindow({ content: "" }); 
+        // const info = new kakao.maps.InfoWindow({ content: "" });
 
         let markers = [];
         const offHandlers: Array<() => void> = [];
-        
 
-        kakao.maps.event.addListener(map , "click" , onMapClick)
-        kakao.maps.event.addListener(map, 'dragstart', onMapClick);
-        kakao.maps.event.addListener(map, 'zoom_changed', onMapClick);  
+        const onIdle = () => {
+       
+          if (idleId.current) {
+            clearTimeout(idleId.current);
+          }
+
+          idleId.current = window.setTimeout(() => {
+            const b = map.getBounds();
+            const sw = b.getSouthWest();
+            const ne = b.getNorthEast();
+            const fmt = (n: number) => n.toFixed(5); 
+            console.log( `${fmt(sw.getLat())}, ${fmt(sw.getLng())} ~ ${fmt(
+              ne.getLat()
+            )}, ${fmt(ne.getLng())}`)
+            setBoundsText(
+              `${fmt(sw.getLat())}, ${fmt(sw.getLng())} ~ ${fmt(
+                ne.getLat()
+              )}, ${fmt(ne.getLng())}`
+            );
+          }, 250);
+        };
+
+        kakao.maps.event.addListener(map, "click", onMapClick);
+        kakao.maps.event.addListener(map, "dragstart", onMapClick);
+        kakao.maps.event.addListener(map, "zoom_changed", onMapClick);
+        kakao.maps.event.addListener(map, "idle", onIdle);
+
+        onIdle();
 
         try {
           const res = await fetch("/api/places");
@@ -89,9 +114,8 @@ export default function Page() {
             const marker = new kakao.maps.Marker({
               position: new kakao.maps.LatLng(item.lat, item.lng),
               map,
-              title: item.title, 
-              category : item.category , 
-
+              title: item.title,
+              category: item.category,
             });
 
             const handler = () => {
@@ -99,24 +123,20 @@ export default function Page() {
               if (infoRoot.current) {
                 infoRoot.current.unmount();
                 infoRoot.current = null;
-              } 
+              }
 
-
-              const container = document.createElement("div"); 
+              const container = document.createElement("div");
               container.className = "marker-overlay"; // CSS용
 
               // 컨테이너 div 생성
               // React Root로 MarkerDetail 렌더
               infoRoot.current = createRoot(container);
               infoRoot.current.render(
-                <MarkerDetail
-                  item={item}
-                  onClose={onMapClick }
-                />
-              ); 
+                <MarkerDetail item={item} onClose={onMapClick} />
+              );
 
-              // 오버레이 생성 
-              if(!overlayRef.current){
+              // 오버레이 생성
+              if (!overlayRef.current) {
                 overlayRef.current = new kakao.maps.CustomOverlay({
                   content: container,
                   position: marker.getPosition(),
@@ -124,9 +144,8 @@ export default function Page() {
                   yAnchor: 1,
                   zIndex: 3,
                   clickable: true, // 오버레이 위 UI 클릭이 지도에 먹히지 않도록
-                });            
-              }
-              else {
+                });
+              } else {
                 overlayRef.current.setContent(container);
                 overlayRef.current.setPosition(marker.getPosition());
                 overlayRef.current.setZIndex(3);
@@ -135,9 +154,8 @@ export default function Page() {
               overlayRef.current?.setMap(map);
             };
 
-
             kakao.maps.event.addListener(marker, "click", handler);
-        
+
             offHandlers.push(() =>
               kakao.maps.event.removeListener(marker, "click", handler)
             );
@@ -163,11 +181,11 @@ export default function Page() {
           infoRoot.current = null;
           offHandlers.forEach((off) => off());
           markers.forEach((m) => m.setMap(null));
-          initializedRef.current = false; 
-          kakao.maps.event.removeListener(map, "click",  onMapClick);
-          kakao.maps.event.removeListener(map, 'dragstart', onMapClick);
-          kakao.maps.event.removeListener(map, 'zoom_changed', onMapClick);  
-
+          initializedRef.current = false;
+          kakao.maps.event.removeListener(map, "click", onMapClick);
+          kakao.maps.event.removeListener(map, "dragstart", onMapClick);
+          kakao.maps.event.removeListener(map, "zoom_changed", onMapClick);
+          kakao.maps.event.removeListener(map, "idle", onIdle);
         };
       });
     };
@@ -179,17 +197,23 @@ export default function Page() {
     const onLoaded = () => init();
 
     window.addEventListener("kakao:loaded", onLoaded);
-    window.addEventListener("keydown" , onKey) ;
-   
-  
+    window.addEventListener("keydown", onKey);
 
     return () => {
-      window.removeEventListener("kakao:loaded", onLoaded);  
-      window.removeEventListener("keydown" , onKey) ;
+      window.removeEventListener("kakao:loaded", onLoaded);
+      window.removeEventListener("keydown", onKey);
       cleanupRef.current?.(); // ✅ 누수 방지
-    
-    }
+    };
   }, []);
 
-  return <div ref={mapRef} className="w-full h-screen" />;
+  return (
+    <>
+      <div ref={mapRef} className="w-full h-screen" />;
+      {boundsText && (
+        <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
+          {boundsText}
+        </div>
+      )}
+    </>
+  );
 }
