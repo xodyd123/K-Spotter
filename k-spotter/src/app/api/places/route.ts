@@ -1,7 +1,17 @@
 import { mockPlaces } from "@/lib/mock/mockData";
 import { NextResponse } from "next/server";
 
-export function GET(){
+export async function POST(request : Request){
 
-    return NextResponse.json(mockPlaces);
+    const data = await request.json() ; 
+
+    const {category} = data ; 
+    
+    
+    const result = mockPlaces.filter(item => {
+       
+        return category[item.category]}) 
+
+    
+    return NextResponse.json(result);
 }

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Place } from "../../type/type";
 import MarkerDetail from "./components/markerDetail";
 import { createRoot, Root } from "react-dom/client";
+import CategoryCheckList from "./components/categoryCheck";
 
 declare global {
   interface Window {
@@ -22,7 +23,7 @@ type CustomOverlayLike = {
 export default function Page() {
   const mapRef = useRef<HTMLDivElement>(null);
 
-  // ✅ 중복 초기화/정리 핸들 보관
+  //  중복 초기화/정리 핸들 보관
   const initializedRef = useRef(false);
   const cleanupRef = useRef<() => void>(() => {});
   const infoRoot = useRef<Root | null>(null);
@@ -36,6 +37,8 @@ export default function Page() {
     const fromStore = localStorage.getItem("devhud") === "1";
     return query || fromStore;
   });
+  
+  const [userCategory , setCategory] = useState({"Drama" : true  ,"Movie" : true  , "MusicVideo" : true}) ;
 
   const onMapClick = () => {
     const ov = overlayRef.current;
@@ -126,7 +129,13 @@ export default function Page() {
         onIdle(); //한번 실행 
 
         try {
-          const res = await fetch("/api/places");
+          const res = await fetch("/api/places" , {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              category : userCategory 
+            }),
+          });
           const places: Place[] = await res.json();
 
           if (!mapRef.current) return; // 언마운트 방어
@@ -226,16 +235,21 @@ export default function Page() {
      
       cleanupRef.current?.(); // ✅ 누수 방지
     };
-  }, []);
+  }, [userCategory]);
+
+
 
   return (
     <>
+
+
       <div ref={mapRef} className="w-full h-screen" />;
       {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
           {boundsText}
         </div>
       )}
+     
     </>
   );
 }
