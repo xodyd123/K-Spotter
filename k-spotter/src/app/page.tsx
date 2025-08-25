@@ -50,6 +50,21 @@ export default function Page() {
   const map = useRef<any>(null);
 
   const markersRef = useRef<any>([]);
+  
+  // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기 
+  const defer = (fn : () => void) => queueMicrotask(fn); 
+
+  function closeOverlay(){
+      // 1) 지도에서 먼저 떼기(동기 OK) 
+      overlayRef.current?.setMap(null);
+      overlayRef.current = null ; 
+
+      // 2) React 서브 루트는 "지연 언마운트" 
+      const root = infoRoot.current ;
+      infoRoot.current = null ; 
+      if(root) defer(() => root.unmount()); 
+  }
+
 
   const onMapClick = () => {
     const ov = overlayRef.current;
@@ -95,27 +110,29 @@ export default function Page() {
 
     const offHandlers: Array<() => void> = [];
 
-    let markers: any = [];
 
     overlayRef.current?.setMap(null);
     overlayRef.current = null;
-    infoRoot.current?.unmount();
+    closeOverlay()
     markersRef.current.forEach((item) => item.setMap(null));
     markersRef.current = [];
 
     const func = async () => {
       try {
+       
         const param = new URLSearchParams();
+
         Object.entries(userCategory)
           .filter(([_, v]) => v)
           .forEach(([k]) => param.append("category", k));
         const res = await fetch(`/api/places?${param.toString()}`);
+        
         const places: Place[] = await res.json();
 
         if (!mapRef.current) return; // 언마운트 방어
 
         // ✅ 마커마다 개별 리스너 등록
-        markers = places.map((item) => {
+        markersRef.current = places.map((item) => {
           const marker = new kakao.maps.Marker({
             position: new kakao.maps.LatLng(item.lat, item.lng),
             map: map.current,
@@ -125,8 +142,8 @@ export default function Page() {
           const handler = () => {
             //  이전 루트 정리
             if (infoRoot.current) {
-              console.log("handler 함수 실행");
-              infoRoot.current.unmount();
+        
+              closeOverlay()
               infoRoot.current = null;
             }
 
@@ -169,9 +186,9 @@ export default function Page() {
         });
 
         // (선택) 전체 보이게 맞추기
-        if (markers.length > 1) {
+        if (markersRef.current.length > 1) {
           const bounds = new kakao.maps.LatLngBounds();
-          markers.forEach((m) => bounds.extend(m.getPosition()));
+          markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
           map.current.setBounds(bounds);
         }
       } catch (e) {
@@ -181,18 +198,12 @@ export default function Page() {
       cleanupRef.current = () => {
         overlayRef.current?.setMap(null);
         overlayRef.current = null;
-        infoRoot.current?.unmount();
+        closeOverlay()
         infoRoot.current = null;
         offHandlers.forEach((off) => off());
-        markers.forEach((m) => m.setMap(null));
+        markersRef.current.forEach((m) => m.setMap(null));
         initializedRef.current = false;
-        kakao.maps.event.removeListener(map.current, "click", onMapClick);
-        kakao.maps.event.removeListener(map.current, "dragstart", onMapClick);
-        kakao.maps.event.removeListener(
-          map.current,
-          "zoom_changed",
-          onMapClick
-        );
+
       };
     };
 
@@ -275,7 +286,7 @@ export default function Page() {
             const handler = () => {
               //  이전 루트 정리
               if (infoRoot.current) {
-                infoRoot.current.unmount();
+                closeOverlay()
                 infoRoot.current = null;
               }
 
@@ -331,7 +342,7 @@ export default function Page() {
         cleanupRef.current = () => {
           overlayRef.current?.setMap(null);
           overlayRef.current = null;
-          infoRoot.current?.unmount();
+          closeOverlay()
           infoRoot.current = null;
           offHandlers.forEach((off) => off());
           markersRef.current.forEach((m) => m.setMap(null));
