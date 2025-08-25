@@ -21,7 +21,7 @@ export const mockPlaces: Place[] = [
         id: "103",
         lat: 37.5796,
         lng: 126.9770,
-        title: "경복궁 (사도/광해 등 다수)",
+        title: "경복궁",
         imageUrl: "/images/gyeongbokgung.jpg",
         category: category.MOVIE,
       },
@@ -31,7 +31,7 @@ export const mockPlaces: Place[] = [
         lng: 127.0592,
         title: "별마당도서관",
         imageUrl: "/images/starfield_library.jpg",
-        category: category.DRAMA,
+        category: category.MUSIC,
       },
       {
         id: "105",
@@ -39,7 +39,7 @@ export const mockPlaces: Place[] = [
         lng: 126.9947,
         title: "이태원 경리단길",
         imageUrl: "/images/itaewon.jpg",
-        category: category.DRAMA,
+        category: category.MUSIC,
       },
   ];
   

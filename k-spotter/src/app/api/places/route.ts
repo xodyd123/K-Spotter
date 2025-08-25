@@ -1,17 +1,18 @@
 import { mockPlaces } from "@/lib/mock/mockData";
-import { NextResponse } from "next/server";
 
-export async function POST(request : Request){
+import { NextRequest ,NextResponse } from "next/server";
 
-    const data = await request.json() ; 
+export async function GET(req: NextRequest){ 
 
-    const {category} = data ; 
-    
-    
-    const result = mockPlaces.filter(item => {
-       
-        return category[item.category]}) 
+    const cat = req.nextUrl.searchParams.getAll("category") ;
+  
 
-    
-    return NextResponse.json(result);
+    if(cat.length === 0){
+        return NextResponse.json(mockPlaces) ; 
+    }
+
+
+
+    return NextResponse.json(mockPlaces.filter(item => cat.includes(item.category)));
+   
 }
