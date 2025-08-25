@@ -37,15 +37,19 @@ export default function Page() {
     const fromStore = localStorage.getItem("devhud") === "1";
     return query || fromStore;
   });
-  
-  const [userCategory , setCategory] = useState({"Drama" : false  ,"Movie" : false  , "MusicVideo" : false}) ; 
 
-  const categories = ["Drama" , "Movie" , "MusicVideo"] as const  ;  
-  
-  type ca = "Drama" |"Movie" | "MusicVideo" 
-  const map = useRef<any>(null) ; 
+  const [userCategory, setCategory] = useState({
+    Drama: false,
+    Movie: false,
+    MusicVideo: false,
+  });
 
-  const markersRef = useRef<any>([]) ;
+  const categories = ["Drama", "Movie", "MusicVideo"] as const;
+
+  type ca = "Drama" | "Movie" | "MusicVideo";
+  const map = useRef<any>(null);
+
+  const markersRef = useRef<any>([]);
 
   const onMapClick = () => {
     const ov = overlayRef.current;
@@ -54,11 +58,16 @@ export default function Page() {
     infoRoot.current?.unmount();
     ov?.setContent("");
     infoRoot.current = null;
-  }; 
+  };
 
+  const selectAll = () => {
+    setCategory({ Drama: true, Movie: true, MusicVideo: true });
+  };
 
-  
-  useEffect(()=>{
+  const clearAll = () =>
+    setCategory({ Drama: false, Movie: false, MusicVideo: false });
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       const typing =
@@ -68,80 +77,71 @@ export default function Page() {
           el.isContentEditable);
       if (e.key === "Escape" && !typing) onMapClick();
       if (e.key.toLowerCase() === "d") {
-        setIsDev(prev => {
-          const next = !prev ; 
-          localStorage.setItem("devhud" , next ? "1" : "0") ;
-          return next; 
-        })
+        setIsDev((prev) => {
+          const next = !prev;
+          localStorage.setItem("devhud", next ? "1" : "0");
+          return next;
+        });
       }
     };
 
-    window.addEventListener("keydown" , onKey) ;
-    return () => window.removeEventListener("keydown" , onKey) ;
-  
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
-  }, [])
-
-  useEffect(() =>{ 
-
-  
-    if (!map.current) return ; 
+  useEffect(() => {
+    if (!map.current) return;
     const { kakao } = window;
 
     const offHandlers: Array<() => void> = [];
- 
-   
-    let markers : any = []; 
 
-    overlayRef.current?.setMap(null)
-    overlayRef.current = null
-    infoRoot.current?.unmount()
-    markersRef.current.forEach(item=> item.setMap(null)) ;
+    let markers: any = [];
+
+    overlayRef.current?.setMap(null);
+    overlayRef.current = null;
+    infoRoot.current?.unmount();
+    markersRef.current.forEach((item) => item.setMap(null));
     markersRef.current = [];
 
-    const func = async () =>{
+    const func = async () => {
       try {
-        const param = new URLSearchParams() ;
-         Object.entries(userCategory).filter(([_ , v]) => v).forEach(([k]) => param.append("category" ,k))
+        const param = new URLSearchParams();
+        Object.entries(userCategory)
+          .filter(([_, v]) => v)
+          .forEach(([k]) => param.append("category", k));
         const res = await fetch(`/api/places?${param.toString()}`);
         const places: Place[] = await res.json();
 
-         
-  
         if (!mapRef.current) return; // 언마운트 방어
-  
+
         // ✅ 마커마다 개별 리스너 등록
         markers = places.map((item) => {
           const marker = new kakao.maps.Marker({
             position: new kakao.maps.LatLng(item.lat, item.lng),
-            map : map.current,
+            map: map.current,
             title: item.title,
-            
           });
-  
+
           const handler = () => {
-           
-    
             //  이전 루트 정리
             if (infoRoot.current) {
-              console.log("handler 함수 실행")
+              console.log("handler 함수 실행");
               infoRoot.current.unmount();
               infoRoot.current = null;
             }
-  
+
             const container = document.createElement("div");
             container.className = "marker-overlay"; // CSS용
-  
+
             // 컨테이너 div 생성
             // React Root로 MarkerDetail 렌더
             infoRoot.current = createRoot(container);
             infoRoot.current.render(
               <MarkerDetail item={item} onClose={onMapClick} />
             );
-  
+
             // 오버레이 생성
             if (!overlayRef.current) {
-             
               overlayRef.current = new kakao.maps.CustomOverlay({
                 content: container,
                 position: marker.getPosition(),
@@ -155,20 +155,19 @@ export default function Page() {
               overlayRef.current.setPosition(marker.getPosition());
               overlayRef.current.setZIndex(3);
             }
-  
+
             overlayRef.current?.setMap(map.current);
           };
-  
+
           kakao.maps.event.addListener(marker, "click", handler);
-  
+
           offHandlers.push(() =>
             kakao.maps.event.removeListener(marker, "click", handler)
           );
-  
+
           return marker;
         });
 
-  
         // (선택) 전체 보이게 맞추기
         if (markers.length > 1) {
           const bounds = new kakao.maps.LatLngBounds();
@@ -189,31 +188,25 @@ export default function Page() {
         initializedRef.current = false;
         kakao.maps.event.removeListener(map.current, "click", onMapClick);
         kakao.maps.event.removeListener(map.current, "dragstart", onMapClick);
-        kakao.maps.event.removeListener(map.current, "zoom_changed", onMapClick);
-        
+        kakao.maps.event.removeListener(
+          map.current,
+          "zoom_changed",
+          onMapClick
+        );
       };
-  
-      
-    }
+    };
 
-  
-  func();
+    func();
 
-  return ()=>{
-     
-    cleanupRef.current?.(); // ✅ 누수 방지
-  }
-  
-   
+    return () => {
+      cleanupRef.current?.(); // ✅ 누수 방지
+    };
+  }, [userCategory]);
 
-  }, [userCategory])
+  const onCategoryClick = (item: ca) => {
+    setCategory((prev) => ({ ...prev, [item]: !prev[item] }));
+  };
 
-
-  const onCategoryClick = (item : ca)=> {
-
-    setCategory(prev => ({...prev , [item] : !prev[item]}) )
-  }
-  
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -227,19 +220,15 @@ export default function Page() {
 
         const { kakao } = window;
 
-
         // 지도 생성
-         map.current = new kakao.maps.Map(mapRef.current, {
+        map.current = new kakao.maps.Map(mapRef.current, {
           center: new kakao.maps.LatLng(37.5665, 126.978),
           level: 5,
         });
 
-    
-
         // ✅ InfoWindow 1개만 재사용
         // const info = new kakao.maps.InfoWindow({ content: "" });
 
-      
         const offHandlers: Array<() => void> = [];
 
         const onIdle = () => {
@@ -248,11 +237,11 @@ export default function Page() {
           }
 
           idleId.current = window.setTimeout(() => {
-            const b = map.current.getBounds()
+            const b = map.current.getBounds();
             const sw = b.getSouthWest();
             const ne = b.getNorthEast();
             const fmt = (n: number) => n.toFixed(5);
- 
+
             setBoundsText(
               `${fmt(sw.getLat())}, ${fmt(sw.getLng())} ~ ${fmt(
                 ne.getLat()
@@ -266,7 +255,7 @@ export default function Page() {
         kakao.maps.event.addListener(map.current, "zoom_changed", onMapClick);
         kakao.maps.event.addListener(map.current, "idle", onIdle);
 
-        onIdle(); //한번 실행 
+        onIdle(); //한번 실행
 
         try {
           const res = await fetch("/api/places");
@@ -278,14 +267,12 @@ export default function Page() {
           markersRef.current = places.map((item) => {
             const marker = new kakao.maps.Marker({
               position: new kakao.maps.LatLng(item.lat, item.lng),
-              map : map.current,
+              map: map.current,
               title: item.title,
               category: item.category,
             });
 
-        
             const handler = () => {
-              
               //  이전 루트 정리
               if (infoRoot.current) {
                 infoRoot.current.unmount();
@@ -330,8 +317,6 @@ export default function Page() {
             return marker;
           });
 
-      
-
           // (선택) 전체 보이게 맞추기
           if (markersRef.current.length > 1) {
             const bounds = new kakao.maps.LatLngBounds();
@@ -353,7 +338,11 @@ export default function Page() {
           initializedRef.current = false;
           kakao.maps.event.removeListener(map.current, "click", onMapClick);
           kakao.maps.event.removeListener(map.current, "dragstart", onMapClick);
-          kakao.maps.event.removeListener(map.current, "zoom_changed", onMapClick);
+          kakao.maps.event.removeListener(
+            map.current,
+            "zoom_changed",
+            onMapClick
+          );
           kakao.maps.event.removeListener(map.current, "idle", onIdle);
         };
       });
@@ -366,52 +355,70 @@ export default function Page() {
     const onLoaded = () => init();
 
     window.addEventListener("kakao:loaded", onLoaded);
- 
 
     return () => {
       window.removeEventListener("kakao:loaded", onLoaded);
-     
+
       cleanupRef.current?.(); // ✅ 누수 방지
     };
   }, []);
-  
-
 
   return (
     <>
-      {/* ChipBar */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20
-                    max-w-[92%] w-[92%] rounded-2xl bg-white/90 backdrop-blur
-                    shadow px-2 py-2 flex items-center gap-2 overflow-x-auto">
-      <div className="flex gap-1.5">
-        {categories.map((item ,index) => {
+      <div
+        className="fixed left-1/2 top-[max(env(safe-area-inset-top),0.5rem)] -translate-x-1/2 z-20
+             w-[min(92%,720px)] px-2"
+      >
+        <div
+          className="rounded-2xl bg-white/80 backdrop-blur-md shadow-lg border border-white/60
+                  px-3 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar"
+        >
+          {/* 추가: 전체/초기화 칩 */}
+          <button
+            onClick={selectAll}
+            className="px-3 py-1.5 rounded-full text-sm border bg-white/70 hover:bg-gray-100
+                 text-gray-800 border-gray-300 transition-colors"
+          >
+            전체 선택
+          </button>
+          <button
+            onClick={clearAll}
+            className="px-3 py-1.5 rounded-full text-sm border bg-white/70 hover:bg-gray-100
+                 text-gray-800 border-gray-300 transition-colors"
+          >
+            초기화
+          </button>
 
-          return (
-            <button 
-             
-              key={`category-${index}`}
-              onClick={() =>  onCategoryClick(item)}
-             
-              // aria-pressed={on}
-              // className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap
-              //             border transition
-              //              ${on ? 'bg-black text-white border-black' : 'bg-white text-gray-800 border-gray-300'}`}
-            >
-              {item}
-            </button>
-          );
-        })}
+          {/* 기존 카테고리 칩들 */}
+          <div className="flex gap-1.5">
+            {categories.map((item, idx) => {
+              const on = userCategory[item];
+              return (
+                <button
+                  key={`category-${idx}`}
+                  onClick={() => onCategoryClick(item)}
+                  aria-pressed={on}
+                  className={[
+                    "px-3 py-1.5 rounded-full text-sm whitespace-nowrap border transition-colors",
+                    on
+                      ? "bg-black text-white border-black shadow-sm"
+                      : "bg-white/70 text-gray-800 border-gray-300 hover:bg-gray-100",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-black/60",
+                  ].join(" ")}
+                >
+                  {item}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
-
-
       <div ref={mapRef} className="w-full h-screen" />;
       {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
           {boundsText}
         </div>
       )}
-     
     </>
   );
 }
