@@ -49,10 +49,12 @@ export default function Page() {
   type ca = "Drama" | "Movie" | "MusicVideo";
   const map = useRef<any>(null);
 
-  const markersRef = useRef<any>([]);
+  const markersRef = useRef<any>([]); 
   
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기 
   const defer = (fn : () => void) => queueMicrotask(fn); 
+  
+  const reqSeq = useRef(0);
 
   function closeOverlay(){
       // 1) 지도에서 먼저 떼기(동기 OK) 
@@ -110,26 +112,27 @@ export default function Page() {
 
     const offHandlers: Array<() => void> = [];
 
-
-    overlayRef.current?.setMap(null);
-    overlayRef.current = null;
     closeOverlay()
     markersRef.current.forEach((item) => item.setMap(null));
     markersRef.current = [];
+    const id = ++reqSeq.current ;
+    const ac = new AbortController() ; 
 
     const func = async () => {
       try {
-       
+ 
         const param = new URLSearchParams();
 
         Object.entries(userCategory)
           .filter(([_, v]) => v)
           .forEach(([k]) => param.append("category", k));
-        const res = await fetch(`/api/places?${param.toString()}`);
+        const res = await fetch(`/api/places?${param.toString()}` , {signal : ac.signal});
         
         const places: Place[] = await res.json();
 
-        if (!mapRef.current) return; // 언마운트 방어
+        if (!mapRef.current) return; // 언마운트 방어 
+      
+        if (id !== reqSeq.current) return ; // <- 오래된 응답 무시 
 
         // ✅ 마커마다 개별 리스너 등록
         markersRef.current = places.map((item) => {
@@ -196,8 +199,6 @@ export default function Page() {
       }
 
       cleanupRef.current = () => {
-        overlayRef.current?.setMap(null);
-        overlayRef.current = null;
         closeOverlay()
         infoRoot.current = null;
         offHandlers.forEach((off) => off());
@@ -211,6 +212,8 @@ export default function Page() {
 
     return () => {
       cleanupRef.current?.(); // ✅ 누수 방지
+      ac.abort() ; 
+      
     };
   }, [userCategory]);
 
@@ -340,8 +343,6 @@ export default function Page() {
 
         // ✅ 정리 루틴 등록
         cleanupRef.current = () => {
-          overlayRef.current?.setMap(null);
-          overlayRef.current = null;
           closeOverlay()
           infoRoot.current = null;
           offHandlers.forEach((off) => off());
