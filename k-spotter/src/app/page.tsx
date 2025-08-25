@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Place } from "../../type/type";
 import MarkerDetail from "./components/markerDetail";
 import { createRoot, Root } from "react-dom/client";
+import CategoryCheckList from "./components/categoryCheck";
 
 declare global {
   interface Window {
@@ -22,7 +23,7 @@ type CustomOverlayLike = {
 export default function Page() {
   const mapRef = useRef<HTMLDivElement>(null);
 
-  // ✅ 중복 초기화/정리 핸들 보관
+  //  중복 초기화/정리 핸들 보관
   const initializedRef = useRef(false);
   const cleanupRef = useRef<() => void>(() => {});
   const infoRoot = useRef<Root | null>(null);
@@ -36,6 +37,15 @@ export default function Page() {
     const fromStore = localStorage.getItem("devhud") === "1";
     return query || fromStore;
   });
+  
+  const [userCategory , setCategory] = useState({"Drama" : false  ,"Movie" : false  , "MusicVideo" : false}) ; 
+
+  const categories = ["Drama" , "Movie" , "MusicVideo"] as const  ;  
+  
+  type ca = "Drama" |"Movie" | "MusicVideo" 
+  const map = useRef<any>(null) ; 
+
+  const markersRef = useRef<any>([]) ;
 
   const onMapClick = () => {
     const ov = overlayRef.current;
@@ -44,7 +54,9 @@ export default function Page() {
     infoRoot.current?.unmount();
     ov?.setContent("");
     infoRoot.current = null;
-  };
+  }; 
+
+
   
   useEffect(()=>{
     const onKey = (e: KeyboardEvent) => {
@@ -70,6 +82,138 @@ export default function Page() {
 
   }, [])
 
+  useEffect(() =>{ 
+
+  
+    if (!map.current) return ; 
+    const { kakao } = window;
+
+    const offHandlers: Array<() => void> = [];
+ 
+   
+    let markers : any = []; 
+
+    overlayRef.current?.setMap(null)
+    overlayRef.current = null
+    infoRoot.current?.unmount()
+    markersRef.current.forEach(item=> item.setMap(null)) ;
+    markersRef.current = [];
+
+    const func = async () =>{
+      try {
+        const param = new URLSearchParams() ;
+         Object.entries(userCategory).filter(([_ , v]) => v).forEach(([k]) => param.append("category" ,k))
+        const res = await fetch(`/api/places?${param.toString()}`);
+        const places: Place[] = await res.json();
+
+         
+  
+        if (!mapRef.current) return; // 언마운트 방어
+  
+        // ✅ 마커마다 개별 리스너 등록
+        markers = places.map((item) => {
+          const marker = new kakao.maps.Marker({
+            position: new kakao.maps.LatLng(item.lat, item.lng),
+            map : map.current,
+            title: item.title,
+            
+          });
+  
+          const handler = () => {
+           
+    
+            //  이전 루트 정리
+            if (infoRoot.current) {
+              console.log("handler 함수 실행")
+              infoRoot.current.unmount();
+              infoRoot.current = null;
+            }
+  
+            const container = document.createElement("div");
+            container.className = "marker-overlay"; // CSS용
+  
+            // 컨테이너 div 생성
+            // React Root로 MarkerDetail 렌더
+            infoRoot.current = createRoot(container);
+            infoRoot.current.render(
+              <MarkerDetail item={item} onClose={onMapClick} />
+            );
+  
+            // 오버레이 생성
+            if (!overlayRef.current) {
+             
+              overlayRef.current = new kakao.maps.CustomOverlay({
+                content: container,
+                position: marker.getPosition(),
+                xAnchor: 0.5,
+                yAnchor: 1,
+                zIndex: 3,
+                clickable: true, // 오버레이 위 UI 클릭이 지도에 먹히지 않도록
+              });
+            } else {
+              overlayRef.current.setContent(container);
+              overlayRef.current.setPosition(marker.getPosition());
+              overlayRef.current.setZIndex(3);
+            }
+  
+            overlayRef.current?.setMap(map.current);
+          };
+  
+          kakao.maps.event.addListener(marker, "click", handler);
+  
+          offHandlers.push(() =>
+            kakao.maps.event.removeListener(marker, "click", handler)
+          );
+  
+          return marker;
+        });
+
+  
+        // (선택) 전체 보이게 맞추기
+        if (markers.length > 1) {
+          const bounds = new kakao.maps.LatLngBounds();
+          markers.forEach((m) => bounds.extend(m.getPosition()));
+          map.current.setBounds(bounds);
+        }
+      } catch (e) {
+        console.error("Failed to load places", e);
+      }
+
+      cleanupRef.current = () => {
+        overlayRef.current?.setMap(null);
+        overlayRef.current = null;
+        infoRoot.current?.unmount();
+        infoRoot.current = null;
+        offHandlers.forEach((off) => off());
+        markers.forEach((m) => m.setMap(null));
+        initializedRef.current = false;
+        kakao.maps.event.removeListener(map.current, "click", onMapClick);
+        kakao.maps.event.removeListener(map.current, "dragstart", onMapClick);
+        kakao.maps.event.removeListener(map.current, "zoom_changed", onMapClick);
+        
+      };
+  
+      
+    }
+
+  
+  func();
+
+  return ()=>{
+     
+    cleanupRef.current?.(); // ✅ 누수 방지
+  }
+  
+   
+
+  }, [userCategory])
+
+
+  const onCategoryClick = (item : ca)=> {
+
+    setCategory(prev => ({...prev , [item] : !prev[item]}) )
+  }
+  
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -83,16 +227,19 @@ export default function Page() {
 
         const { kakao } = window;
 
+
         // 지도 생성
-        const map = new kakao.maps.Map(mapRef.current, {
+         map.current = new kakao.maps.Map(mapRef.current, {
           center: new kakao.maps.LatLng(37.5665, 126.978),
           level: 5,
         });
 
+    
+
         // ✅ InfoWindow 1개만 재사용
         // const info = new kakao.maps.InfoWindow({ content: "" });
 
-        let markers = [];
+      
         const offHandlers: Array<() => void> = [];
 
         const onIdle = () => {
@@ -101,15 +248,11 @@ export default function Page() {
           }
 
           idleId.current = window.setTimeout(() => {
-            const b = map.getBounds();
+            const b = map.current.getBounds()
             const sw = b.getSouthWest();
             const ne = b.getNorthEast();
             const fmt = (n: number) => n.toFixed(5);
-            console.log(
-              `${fmt(sw.getLat())}, ${fmt(sw.getLng())} ~ ${fmt(
-                ne.getLat()
-              )}, ${fmt(ne.getLng())}`
-            );
+ 
             setBoundsText(
               `${fmt(sw.getLat())}, ${fmt(sw.getLng())} ~ ${fmt(
                 ne.getLat()
@@ -118,10 +261,10 @@ export default function Page() {
           }, 250);
         };
 
-        kakao.maps.event.addListener(map, "click", onMapClick);
-        kakao.maps.event.addListener(map, "dragstart", onMapClick);
-        kakao.maps.event.addListener(map, "zoom_changed", onMapClick);
-        kakao.maps.event.addListener(map, "idle", onIdle);
+        kakao.maps.event.addListener(map.current, "click", onMapClick);
+        kakao.maps.event.addListener(map.current, "dragstart", onMapClick);
+        kakao.maps.event.addListener(map.current, "zoom_changed", onMapClick);
+        kakao.maps.event.addListener(map.current, "idle", onIdle);
 
         onIdle(); //한번 실행 
 
@@ -132,15 +275,17 @@ export default function Page() {
           if (!mapRef.current) return; // 언마운트 방어
 
           // ✅ 마커마다 개별 리스너 등록
-          markers = places.map((item) => {
+          markersRef.current = places.map((item) => {
             const marker = new kakao.maps.Marker({
               position: new kakao.maps.LatLng(item.lat, item.lng),
-              map,
+              map : map.current,
               title: item.title,
               category: item.category,
             });
 
+        
             const handler = () => {
+              
               //  이전 루트 정리
               if (infoRoot.current) {
                 infoRoot.current.unmount();
@@ -173,7 +318,7 @@ export default function Page() {
                 overlayRef.current.setZIndex(3);
               }
 
-              overlayRef.current?.setMap(map);
+              overlayRef.current?.setMap(map.current);
             };
 
             kakao.maps.event.addListener(marker, "click", handler);
@@ -185,11 +330,13 @@ export default function Page() {
             return marker;
           });
 
+      
+
           // (선택) 전체 보이게 맞추기
-          if (markers.length > 1) {
+          if (markersRef.current.length > 1) {
             const bounds = new kakao.maps.LatLngBounds();
-            markers.forEach((m) => bounds.extend(m.getPosition()));
-            map.setBounds(bounds);
+            markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
+            map.current.setBounds(bounds);
           }
         } catch (e) {
           console.error("Failed to load places", e);
@@ -202,12 +349,12 @@ export default function Page() {
           infoRoot.current?.unmount();
           infoRoot.current = null;
           offHandlers.forEach((off) => off());
-          markers.forEach((m) => m.setMap(null));
+          markersRef.current.forEach((m) => m.setMap(null));
           initializedRef.current = false;
-          kakao.maps.event.removeListener(map, "click", onMapClick);
-          kakao.maps.event.removeListener(map, "dragstart", onMapClick);
-          kakao.maps.event.removeListener(map, "zoom_changed", onMapClick);
-          kakao.maps.event.removeListener(map, "idle", onIdle);
+          kakao.maps.event.removeListener(map.current, "click", onMapClick);
+          kakao.maps.event.removeListener(map.current, "dragstart", onMapClick);
+          kakao.maps.event.removeListener(map.current, "zoom_changed", onMapClick);
+          kakao.maps.event.removeListener(map.current, "idle", onIdle);
         };
       });
     };
@@ -227,15 +374,44 @@ export default function Page() {
       cleanupRef.current?.(); // ✅ 누수 방지
     };
   }, []);
+  
+
 
   return (
     <>
+      {/* ChipBar */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20
+                    max-w-[92%] w-[92%] rounded-2xl bg-white/90 backdrop-blur
+                    shadow px-2 py-2 flex items-center gap-2 overflow-x-auto">
+      <div className="flex gap-1.5">
+        {categories.map((item ,index) => {
+
+          return (
+            <button 
+             
+              key={`category-${index}`}
+              onClick={() =>  onCategoryClick(item)}
+             
+              // aria-pressed={on}
+              // className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap
+              //             border transition
+              //              ${on ? 'bg-black text-white border-black' : 'bg-white text-gray-800 border-gray-300'}`}
+            >
+              {item}
+            </button>
+          );
+        })}
+        </div>
+      </div>
+
+
       <div ref={mapRef} className="w-full h-screen" />;
       {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
           {boundsText}
         </div>
       )}
+     
     </>
   );
 }
