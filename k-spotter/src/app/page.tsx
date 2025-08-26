@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useInsertionEffect, useRef, useState } from "react";
 import { Place } from "../../type/type";
 import MarkerDetail from "./components/markerDetail";
 import { createRoot, Root } from "react-dom/client";
@@ -48,13 +48,19 @@ export default function Page() {
   const [showSpinner, setShowSpinner] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const delayT = useRef<number | null>(null);
-
   const categories = ["Drama", "Movie", "MusicVideo"] as const;
 
   type ca = "Drama" | "Movie" | "MusicVideo";
   const map = useRef<any>(null);
 
   const markersRef = useRef<any>([]);
+  
+  // 플래그들
+  const userInteractedRef = useRef<boolean>(false) ; 
+  const didInitialFitRef  = useRef<boolean>(false) ; // 초기 1회 fitBounds 허용 스위치
+  const allowAutoMoveUntilRef = useRef<number>(0) ; // 초기 자동이동 허용 시간창(ms)
+  const programmaticMoveCntRef = useRef<number>(0) ;
+  
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
@@ -93,7 +99,20 @@ export default function Page() {
       clearTimeout(delayT.current);
       delayT.current = null;
     }
-  };
+  }; 
+
+  const allowAutoMove = () => {
+    return !userInteractedRef.current && Date.now() <= allowAutoMoveUntilRef.current;
+  }
+
+  // 한 번만 fitBounds 실행 
+  const fitBoundsOnce = (bounds : any) => {
+    if(didInitialFitRef.current || !allowAutoMove()) return false; 
+    programmaticMoveCntRef.current += 1 ; 
+    map.current.setBounds(bounds) ; 
+    didInitialFitRef.current = true;       // ✅ 여기서 true로 바꿈 (한 번만 허용)
+    return true; 
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -211,7 +230,7 @@ export default function Page() {
         if (markersRef.current.length > 1) {
           const bounds = new kakao.maps.LatLngBounds();
           markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
-          map.current.setBounds(bounds);
+          fitBoundsOnce(bounds);
         }
       } catch (e: any) {
         if (e.name !== "AbortError") setLoadError("불러오기 실패");
@@ -281,8 +300,7 @@ export default function Page() {
           level: 5,
         });
 
-        // ✅ InfoWindow 1개만 재사용
-        // const info = new kakao.maps.InfoWindow({ content: "" });
+        allowAutoMoveUntilRef.current = Date.now() + 3000 ; 
 
         const offHandlers: Array<() => void> = [];
 
@@ -303,18 +321,40 @@ export default function Page() {
                 ne.getLat()
               )}, ${fmt(ne.getLng())}`
             );
+
+            if(programmaticMoveCntRef.current > 0){
+              programmaticMoveCntRef.current = Math.max(0 , programmaticMoveCntRef.current-1) ; 
+            }
           }, 250);
         };
 
+        const onDragStart = () => {
+           userInteractedRef.current = true ; // 사용자가 손댐
+           onMapClick() ; //기존 동작 유지 
+    
+
+        }
+
+        const onZoomChanged = () => {
+           // 우리가 움직이는 중이 아니면 사용자 줌으로 간주 
+           if(programmaticMoveCntRef.current === 0){
+            userInteractedRef.current = true ; 
+           }
+
+           onMapClick();
+
+        }
+
         kakao.maps.event.addListener(map.current, "click", onMapClick);
-        kakao.maps.event.addListener(map.current, "dragstart", onMapClick);
-        kakao.maps.event.addListener(map.current, "zoom_changed", onMapClick);
+        kakao.maps.event.addListener(map.current, "dragstart", onDragStart);
+        kakao.maps.event.addListener(map.current, "zoom_changed", onZoomChanged);
         kakao.maps.event.addListener(map.current, "idle", onIdle);
         kakao.maps.event.addListener(
           map.current,
           "tilesloaded",
           handleTilesLoaded
         );
+        
 
         onIdle(); //한번 실행
 
@@ -382,7 +422,8 @@ export default function Page() {
           if (markersRef.current.length > 1) {
             const bounds = new kakao.maps.LatLngBounds();
             markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
-            map.current.setBounds(bounds);
+          // (교체)
+          fitBoundsOnce(bounds);  // 초기 1회/허용 창 내/미개입일 때만 실행, 그 외엔 조용히 무시     
           }
         } catch (e) {
           console.error("Failed to load places", e);

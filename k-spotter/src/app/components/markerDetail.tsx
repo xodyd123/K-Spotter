@@ -29,12 +29,16 @@ export default function MarkerDetail({
         );
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json();
+       
         const raw = j?.response?.body?.items?.item;
-
+        
         const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
-        setImgUrl(items[0]?.galWebImageUrl ?? null);
+        console.log(items[2]?.galWebImageUrl);
+       
+        setImgUrl(items[3]?.galWebImageUrl);
        
       } catch (e) {
+        
         if ((e as any).name !== "AbortError") setError(true);
       }
     })();
