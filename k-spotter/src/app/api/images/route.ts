@@ -1,3 +1,4 @@
+import { console } from "inspector";
 import { NextRequest, NextResponse } from "next/server";
 
 const BASE = "https://apis.data.go.kr/B551011/PhotoGalleryService1/gallerySearchList1";
@@ -28,6 +29,7 @@ export async function GET(req: NextRequest) {
     const url = `${BASE}?serviceKey=${SERVICE_KEY}&${params.toString()}`;
 
     const upstream = await fetch(url, { cache: "no-store" });
+    
   
 
     const data = await upstream.json(); // _type=json 필수
