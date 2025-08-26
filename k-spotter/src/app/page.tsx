@@ -43,6 +43,11 @@ export default function Page() {
     Movie: false,
     MusicVideo: false,
   });
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [showSpinner, setShowSpinner] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const delayT = useRef<number | null>(null);
 
   const categories = ["Drama", "Movie", "MusicVideo"] as const;
 
@@ -50,21 +55,22 @@ export default function Page() {
   const map = useRef<any>(null);
 
   const markersRef = useRef<any>([]);
-  
-  // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기 
-  const defer = (fn : () => void) => queueMicrotask(fn); 
 
-  function closeOverlay(){
-      // 1) 지도에서 먼저 떼기(동기 OK) 
-      overlayRef.current?.setMap(null);
-      overlayRef.current = null ; 
+  // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
+  const defer = (fn: () => void) => queueMicrotask(fn);
 
-      // 2) React 서브 루트는 "지연 언마운트" 
-      const root = infoRoot.current ;
-      infoRoot.current = null ; 
-      if(root) defer(() => root.unmount()); 
+  const reqSeq = useRef(0);
+
+  function closeOverlay() {
+    // 1) 지도에서 먼저 떼기(동기 OK)
+    overlayRef.current?.setMap(null);
+    overlayRef.current = null;
+
+    // 2) React 서브 루트는 "지연 언마운트"
+    const root = infoRoot.current;
+    infoRoot.current = null;
+    if (root) defer(() => root.unmount());
   }
-
 
   const onMapClick = () => {
     const ov = overlayRef.current;
@@ -81,6 +87,13 @@ export default function Page() {
 
   const clearAll = () =>
     setCategory({ Drama: false, Movie: false, MusicVideo: false });
+
+  const clearDelay = () => {
+    if (delayT.current) {
+      clearTimeout(delayT.current);
+      delayT.current = null;
+    }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -110,28 +123,38 @@ export default function Page() {
 
     const offHandlers: Array<() => void> = [];
 
-
-    overlayRef.current?.setMap(null);
-    overlayRef.current = null;
-    closeOverlay()
+    closeOverlay();
     markersRef.current.forEach((item) => item.setMap(null));
     markersRef.current = [];
 
+    const id = ++reqSeq.current;
+    const ac = new AbortController();
+
+    // 요청시작
+    setLoading(true);
+    setLoadError(null);
+    setShowSpinner(false); // 새요청을 시작할때 스피너 초기화
+    clearDelay();
+    const myDelayId = window.setTimeout(() => setShowSpinner(true), 300);
+    delayT.current = myDelayId ; 
+
     const func = async () => {
       try {
-       
         const param = new URLSearchParams();
 
         Object.entries(userCategory)
           .filter(([_, v]) => v)
           .forEach(([k]) => param.append("category", k));
-        const res = await fetch(`/api/places?${param.toString()}`);
-        
+        const res = await fetch(`/api/places?${param.toString()}`, {
+          signal: ac.signal,
+        });
+
         const places: Place[] = await res.json();
 
         if (!mapRef.current) return; // 언마운트 방어
 
-        // ✅ 마커마다 개별 리스너 등록
+        if (id !== reqSeq.current) return; // <- 오래된 응답 무시
+
         markersRef.current = places.map((item) => {
           const marker = new kakao.maps.Marker({
             position: new kakao.maps.LatLng(item.lat, item.lng),
@@ -142,8 +165,7 @@ export default function Page() {
           const handler = () => {
             //  이전 루트 정리
             if (infoRoot.current) {
-        
-              closeOverlay()
+              closeOverlay();
               infoRoot.current = null;
             }
 
@@ -191,26 +213,40 @@ export default function Page() {
           markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
           map.current.setBounds(bounds);
         }
-      } catch (e) {
-        console.error("Failed to load places", e);
+      } catch (e: any) {
+        if (e.name !== "AbortError") setLoadError("불러오기 실패");
+      } finally {
+        if (id === reqSeq.current) {
+          setLoading(false);
+          // 이 요청이 만든 지연 타이머만 해제 + 스피너 끄기
+          if (delayT.current === myDelayId) {
+            clearTimeout(myDelayId);
+            delayT.current = null;
+            setShowSpinner(false);
+          }
+
+        }
+
+
+       
       }
-
-      cleanupRef.current = () => {
-        overlayRef.current?.setMap(null);
-        overlayRef.current = null;
-        closeOverlay()
-        infoRoot.current = null;
-        offHandlers.forEach((off) => off());
-        markersRef.current.forEach((m) => m.setMap(null));
-        initializedRef.current = false;
-
-      };
     };
 
     func();
 
     return () => {
-      cleanupRef.current?.(); // ✅ 누수 방지
+      ac.abort();
+      offHandlers.forEach((off) => off());
+      markersRef.current.forEach((m) => m.setMap(null));
+      markersRef.current = [];
+      closeOverlay();
+     
+       // 이 요청이 만든 타이머만 해제
+  if (delayT.current === myDelayId) {
+    clearTimeout(myDelayId);
+    delayT.current = null;
+    setShowSpinner(false);
+  }
     };
   }, [userCategory]);
 
@@ -225,6 +261,14 @@ export default function Page() {
       if (!window.kakao?.maps) return;
       if (initializedRef.current) return; // ✅ 중복 방지
       initializedRef.current = true;
+      const handleTilesLoaded = () => {
+        setMapReady(true);
+        kakao.maps.event.removeListener(
+          map.current,
+          "tilesloaded",
+          handleTilesLoaded
+        );
+      };
 
       window.kakao.maps.load(async () => {
         if (!mapRef.current) return;
@@ -245,6 +289,7 @@ export default function Page() {
         const onIdle = () => {
           if (idleId.current) {
             clearTimeout(idleId.current);
+            idleId.current = null ;
           }
 
           idleId.current = window.setTimeout(() => {
@@ -265,6 +310,11 @@ export default function Page() {
         kakao.maps.event.addListener(map.current, "dragstart", onMapClick);
         kakao.maps.event.addListener(map.current, "zoom_changed", onMapClick);
         kakao.maps.event.addListener(map.current, "idle", onIdle);
+        kakao.maps.event.addListener(
+          map.current,
+          "tilesloaded",
+          handleTilesLoaded
+        );
 
         onIdle(); //한번 실행
 
@@ -286,7 +336,7 @@ export default function Page() {
             const handler = () => {
               //  이전 루트 정리
               if (infoRoot.current) {
-                closeOverlay()
+                closeOverlay();
                 infoRoot.current = null;
               }
 
@@ -340,9 +390,8 @@ export default function Page() {
 
         // ✅ 정리 루틴 등록
         cleanupRef.current = () => {
-          overlayRef.current?.setMap(null);
-          overlayRef.current = null;
-          closeOverlay()
+         
+          closeOverlay();
           infoRoot.current = null;
           offHandlers.forEach((off) => off());
           markersRef.current.forEach((m) => m.setMap(null));
@@ -355,6 +404,12 @@ export default function Page() {
             onMapClick
           );
           kakao.maps.event.removeListener(map.current, "idle", onIdle);
+
+          if (idleId.current) {
+            clearTimeout(idleId.current);
+            idleId.current = null;
+          }
+        
         };
       });
     };
@@ -375,7 +430,7 @@ export default function Page() {
   }, []);
 
   return (
-    <>
+    <div>
       <div
         className="fixed left-1/2 top-[max(env(safe-area-inset-top),0.5rem)] -translate-x-1/2 z-20
              w-[min(92%,720px)] px-2"
@@ -407,6 +462,7 @@ export default function Page() {
               return (
                 <button
                   key={`category-${idx}`}
+                  disabled={loading}
                   onClick={() => onCategoryClick(item)}
                   aria-pressed={on}
                   className={[
@@ -422,14 +478,54 @@ export default function Page() {
               );
             })}
           </div>
+          <div className="ml-auto">
+            {showSpinner && (
+              <span className="text-xs text-black">불러오는 중…</span>
+            )}
+          </div>
+          {!loading && !loadError && markersRef.current.length === 0 && (
+            <div className="text-xs px-2 py-1 rounded bg-black border">
+              이 범위에는 결과가 없어요
+            </div>
+          )}
+          {loadError && (
+            <div className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200">
+              {loadError}
+            </div>
+          )}
         </div>
       </div>
-      <div ref={mapRef} className="w-full h-screen" />;
+
+      <div className="relative w-full h-screen">
+        <div ref={mapRef} className="absolute inset-0" />
+
+        {/* 처음 지도 타일 스켈레톤 */}
+        {!mapReady && (
+          <div
+            className="absolute inset-0 z-30 bg-gray-100/60 backdrop-blur-sm"
+            aria-hidden
+          >
+            <div
+              className="absolute left-1/2 top-3 -translate-x-1/2 w-[min(92%,720px)] h-12 
+                      rounded-2xl bg-white/70 animate-pulse"
+            />
+            <div className="absolute bottom-4 left-4 w-36 h-8 rounded bg-white/70 animate-pulse" />
+          </div>
+        )}
+
+        {/* 데이터 로딩 상태(마커 fetch) */}
+        {mapReady && showSpinner && (
+          <div className="absolute top-4 right-4 z-30 text-xs px-2 py-1 rounded bg-black/80 text-white">
+            장소 불러오는 중…
+          </div>
+        )}
+      </div>
+
       {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
           {boundsText}
         </div>
       )}
-    </>
+    </div>
   );
 }

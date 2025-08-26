@@ -23,7 +23,7 @@ export const mockPlaces: Place[] = [
         lng: 126.9770,
         title: "경복궁",
         imageUrl: "/images/gyeongbokgung.jpg",
-        category: category.MOVIE,
+        category: category.MUSIC,
       },
       {
         id: "104",
