@@ -190,6 +190,5 @@ export default function Page() {
     
     }
   }, []);
-
   return <div ref={mapRef} className="w-full h-screen" />;
 }
