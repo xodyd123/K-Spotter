@@ -43,30 +43,34 @@ export default function Page() {
     Movie: false,
     MusicVideo: false,
   });
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [sdkReady , setSdkReady] = useState(false) ; 
+  const [showSpinner , setShowSpinner] = useState(false) ;
+  const delayT = useRef<number|null> (null) ; 
 
   const categories = ["Drama", "Movie", "MusicVideo"] as const;
 
   type ca = "Drama" | "Movie" | "MusicVideo";
   const map = useRef<any>(null);
 
-  const markersRef = useRef<any>([]); 
-  
-  // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기 
-  const defer = (fn : () => void) => queueMicrotask(fn); 
-  
+  const markersRef = useRef<any>([]);
+
+  // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
+  const defer = (fn: () => void) => queueMicrotask(fn);
+
   const reqSeq = useRef(0);
 
-  function closeOverlay(){
-      // 1) 지도에서 먼저 떼기(동기 OK) 
-      overlayRef.current?.setMap(null);
-      overlayRef.current = null ; 
+  function closeOverlay() {
+    // 1) 지도에서 먼저 떼기(동기 OK)
+    overlayRef.current?.setMap(null);
+    overlayRef.current = null;
 
-      // 2) React 서브 루트는 "지연 언마운트" 
-      const root = infoRoot.current ;
-      infoRoot.current = null ; 
-      if(root) defer(() => root.unmount()); 
+    // 2) React 서브 루트는 "지연 언마운트"
+    const root = infoRoot.current;
+    infoRoot.current = null;
+    if (root) defer(() => root.unmount());
   }
-
 
   const onMapClick = () => {
     const ov = overlayRef.current;
@@ -83,6 +87,13 @@ export default function Page() {
 
   const clearAll = () =>
     setCategory({ Drama: false, Movie: false, MusicVideo: false });
+
+  const clearDelay = () => {
+    if(delayT.current){
+      clearTimeout(delayT.current) ; 
+      delayT.current = null ; 
+    }
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -112,29 +123,38 @@ export default function Page() {
 
     const offHandlers: Array<() => void> = [];
 
-    closeOverlay()
+    closeOverlay();
     markersRef.current.forEach((item) => item.setMap(null));
     markersRef.current = [];
-    const id = ++reqSeq.current ;
-    const ac = new AbortController() ; 
+ 
+    const id = ++reqSeq.current;
+    const ac = new AbortController();
+
+    // 요청시작 
+    setLoading(true);
+    setLoadError(null);
+    setShowSpinner(false);  // 새요청을 시작할때 스피너 초기화 
+    clearDelay() ; 
+    delayT.current = window.setTimeout(() => setShowSpinner(true) , 300) ; 
+
 
     const func = async () => {
       try {
- 
         const param = new URLSearchParams();
-
+   
         Object.entries(userCategory)
           .filter(([_, v]) => v)
           .forEach(([k]) => param.append("category", k));
-        const res = await fetch(`/api/places?${param.toString()}` , {signal : ac.signal});
-        
+        const res = await fetch(`/api/places?${param.toString()}`, {
+          signal: ac.signal,
+        });
+
         const places: Place[] = await res.json();
 
-        if (!mapRef.current) return; // 언마운트 방어 
-      
-        if (id !== reqSeq.current) return ; // <- 오래된 응답 무시 
+        if (!mapRef.current) return; // 언마운트 방어
 
-        // ✅ 마커마다 개별 리스너 등록
+        if (id !== reqSeq.current) return; // <- 오래된 응답 무시
+
         markersRef.current = places.map((item) => {
           const marker = new kakao.maps.Marker({
             position: new kakao.maps.LatLng(item.lat, item.lng),
@@ -145,8 +165,7 @@ export default function Page() {
           const handler = () => {
             //  이전 루트 정리
             if (infoRoot.current) {
-        
-              closeOverlay()
+              closeOverlay();
               infoRoot.current = null;
             }
 
@@ -194,26 +213,25 @@ export default function Page() {
           markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
           map.current.setBounds(bounds);
         }
-      } catch (e) {
-        console.error("Failed to load places", e);
+      } catch (e: any) {
+        if (e.name !== "AbortError") setLoadError("불러오기 실패");
+      } finally {
+        if (id === reqSeq.current) setLoading(false);
+        clearDelay();
+        setShowSpinner(false);
       }
-
-      cleanupRef.current = () => {
-        closeOverlay()
-        infoRoot.current = null;
-        offHandlers.forEach((off) => off());
-        markersRef.current.forEach((m) => m.setMap(null));
-        initializedRef.current = false;
-
-      };
     };
 
     func();
 
     return () => {
-      cleanupRef.current?.(); // ✅ 누수 방지
-      ac.abort() ; 
-      
+      ac.abort();
+      offHandlers.forEach((off) => off());
+      markersRef.current.forEach((m) => m.setMap(null));
+      markersRef.current = [];
+      closeOverlay();
+      setShowSpinner(false);
+      clearDelay();  
     };
   }, [userCategory]);
 
@@ -225,6 +243,8 @@ export default function Page() {
     if (!mapRef.current) return;
 
     const init = () => {
+  
+    
       if (!window.kakao?.maps) return;
       if (initializedRef.current) return; // ✅ 중복 방지
       initializedRef.current = true;
@@ -289,7 +309,7 @@ export default function Page() {
             const handler = () => {
               //  이전 루트 정리
               if (infoRoot.current) {
-                closeOverlay()
+                closeOverlay();
                 infoRoot.current = null;
               }
 
@@ -343,7 +363,7 @@ export default function Page() {
 
         // ✅ 정리 루틴 등록
         cleanupRef.current = () => {
-          closeOverlay()
+          closeOverlay();
           infoRoot.current = null;
           offHandlers.forEach((off) => off());
           markersRef.current.forEach((m) => m.setMap(null));
@@ -376,7 +396,7 @@ export default function Page() {
   }, []);
 
   return (
-    <>
+    <div>
       <div
         className="fixed left-1/2 top-[max(env(safe-area-inset-top),0.5rem)] -translate-x-1/2 z-20
              w-[min(92%,720px)] px-2"
@@ -408,6 +428,7 @@ export default function Page() {
               return (
                 <button
                   key={`category-${idx}`}
+                  disabled={loading}
                   onClick={() => onCategoryClick(item)}
                   aria-pressed={on}
                   className={[
@@ -423,14 +444,30 @@ export default function Page() {
               );
             })}
           </div>
+          <div className="ml-auto">
+            {showSpinner && (
+              <span className="text-xs text-black">불러오는 중…</span>
+            )}
+          </div>
+          {!loading && !loadError && markersRef.current.length === 0 && (
+            <div className="text-xs px-2 py-1 rounded bg-black border">
+              이 범위에는 결과가 없어요
+            </div>
+          )}
+          {loadError && (
+            <div className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200">
+              {loadError}
+            </div>
+          )}
         </div>
       </div>
-      <div ref={mapRef} className="w-full h-screen" />;
+      <div ref={mapRef} className="w-full h-screen" />
+
       {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
           {boundsText}
         </div>
       )}
-    </>
+    </div>
   );
 }
