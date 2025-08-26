@@ -54,13 +54,10 @@ export default function Page() {
   const map = useRef<any>(null);
 
   const markersRef = useRef<any>([]);
-  
-  // 플래그들
-  const userInteractedRef = useRef<boolean>(false) ; 
-  const didInitialFitRef  = useRef<boolean>(false) ; // 초기 1회 fitBounds 허용 스위치
-  const allowAutoMoveUntilRef = useRef<number>(0) ; // 초기 자동이동 허용 시간창(ms)
-  const programmaticMoveCntRef = useRef<number>(0) ;
-  
+  const userInteractedRef = useRef<boolean>(false);
+  const didInitialFitRef = useRef<boolean>(false); // 초기 1회 fitBounds 허용 스위치
+  const allowAutoMoveUntilRef = useRef<number>(0); // 초기 자동이동 허용 시간창(ms)
+  const programmaticMoveCntRef = useRef<number>(0);
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
@@ -99,20 +96,22 @@ export default function Page() {
       clearTimeout(delayT.current);
       delayT.current = null;
     }
-  }; 
+  };
 
   const allowAutoMove = () => {
-    return !userInteractedRef.current && Date.now() <= allowAutoMoveUntilRef.current;
-  }
+    return (
+      !userInteractedRef.current && Date.now() <= allowAutoMoveUntilRef.current
+    );
+  };
 
-  // 한 번만 fitBounds 실행 
-  const fitBoundsOnce = (bounds : any) => {
-    if(didInitialFitRef.current || !allowAutoMove()) return false; 
-    programmaticMoveCntRef.current += 1 ; 
-    map.current.setBounds(bounds) ; 
-    didInitialFitRef.current = true;       // ✅ 여기서 true로 바꿈 (한 번만 허용)
-    return true; 
-  }
+  // 한 번만 fitBounds 실행
+  const fitBoundsOnce = (bounds: any) => {
+    if (didInitialFitRef.current || !allowAutoMove()) return false;
+    programmaticMoveCntRef.current += 1;
+    map.current.setBounds(bounds);
+    didInitialFitRef.current = true; // ✅ 여기서 true로 바꿈 (한 번만 허용)
+    return true;
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -155,7 +154,7 @@ export default function Page() {
     setShowSpinner(false); // 새요청을 시작할때 스피너 초기화
     clearDelay();
     const myDelayId = window.setTimeout(() => setShowSpinner(true), 300);
-    delayT.current = myDelayId ; 
+    delayT.current = myDelayId;
 
     const func = async () => {
       try {
@@ -243,11 +242,7 @@ export default function Page() {
             delayT.current = null;
             setShowSpinner(false);
           }
-
         }
-
-
-       
       }
     };
 
@@ -259,13 +254,13 @@ export default function Page() {
       markersRef.current.forEach((m) => m.setMap(null));
       markersRef.current = [];
       closeOverlay();
-     
-       // 이 요청이 만든 타이머만 해제
-  if (delayT.current === myDelayId) {
-    clearTimeout(myDelayId);
-    delayT.current = null;
-    setShowSpinner(false);
-  }
+
+      // 이 요청이 만든 타이머만 해제
+      if (delayT.current === myDelayId) {
+        clearTimeout(myDelayId);
+        delayT.current = null;
+        setShowSpinner(false);
+      }
     };
   }, [userCategory]);
 
@@ -300,14 +295,21 @@ export default function Page() {
           level: 5,
         });
 
-        allowAutoMoveUntilRef.current = Date.now() + 3000 ; 
+        allowAutoMoveUntilRef.current = Date.now() + 5000;
 
         const offHandlers: Array<() => void> = [];
 
         const onIdle = () => {
+
+          if (programmaticMoveCntRef.current > 0) {
+            programmaticMoveCntRef.current = Math.max(
+              0,
+              programmaticMoveCntRef.current - 1
+            );
+          }
           if (idleId.current) {
             clearTimeout(idleId.current);
-            idleId.current = null ;
+            idleId.current = null;
           }
 
           idleId.current = window.setTimeout(() => {
@@ -322,39 +324,42 @@ export default function Page() {
               )}, ${fmt(ne.getLng())}`
             );
 
-            if(programmaticMoveCntRef.current > 0){
-              programmaticMoveCntRef.current = Math.max(0 , programmaticMoveCntRef.current-1) ; 
-            }
+     
           }, 250);
         };
 
         const onDragStart = () => {
-           userInteractedRef.current = true ; // 사용자가 손댐
-           onMapClick() ; //기존 동작 유지 
-    
-
-        }
+          userInteractedRef.current = true; // 사용자가 손댐
+          onMapClick(); //기존 동작 유지
+        };
 
         const onZoomChanged = () => {
-           // 우리가 움직이는 중이 아니면 사용자 줌으로 간주 
-           if(programmaticMoveCntRef.current === 0){
-            userInteractedRef.current = true ; 
-           }
+          // 우리가 움직이는 중이 아니면 사용자 줌으로 간주
+          if (programmaticMoveCntRef.current === 0) {
+            userInteractedRef.current = true;
+          }
 
-           onMapClick();
+          onMapClick();
+        };
 
+        const onMapCanvasClick = () => {
+          userInteractedRef.current = true ; 
+          onMapClick();
         }
 
-        kakao.maps.event.addListener(map.current, "click", onMapClick);
+        kakao.maps.event.addListener(map.current, "click", onMapCanvasClick);
         kakao.maps.event.addListener(map.current, "dragstart", onDragStart);
-        kakao.maps.event.addListener(map.current, "zoom_changed", onZoomChanged);
+        kakao.maps.event.addListener(
+          map.current,
+          "zoom_changed",
+          onZoomChanged
+        );
         kakao.maps.event.addListener(map.current, "idle", onIdle);
         kakao.maps.event.addListener(
           map.current,
           "tilesloaded",
           handleTilesLoaded
         );
-        
 
         onIdle(); //한번 실행
 
@@ -422,8 +427,8 @@ export default function Page() {
           if (markersRef.current.length > 1) {
             const bounds = new kakao.maps.LatLngBounds();
             markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
-          // (교체)
-          fitBoundsOnce(bounds);  // 초기 1회/허용 창 내/미개입일 때만 실행, 그 외엔 조용히 무시     
+            // (교체)
+            fitBoundsOnce(bounds); // 초기 1회/허용 창 내/미개입일 때만 실행, 그 외엔 조용히 무시
           }
         } catch (e) {
           console.error("Failed to load places", e);
@@ -431,26 +436,21 @@ export default function Page() {
 
         // ✅ 정리 루틴 등록
         cleanupRef.current = () => {
-         
           closeOverlay();
           infoRoot.current = null;
           offHandlers.forEach((off) => off());
           markersRef.current.forEach((m) => m.setMap(null));
           initializedRef.current = false;
           kakao.maps.event.removeListener(map.current, "click", onMapClick);
-          kakao.maps.event.removeListener(map.current, "dragstart", onMapClick);
-          kakao.maps.event.removeListener(
-            map.current,
-            "zoom_changed",
-            onMapClick
-          );
+          kakao.maps.event.removeListener(map.current, "dragstart", onDragStart);
+          kakao.maps.event.removeListener(map.current, "zoom_changed",onZoomChanged);
           kakao.maps.event.removeListener(map.current, "idle", onIdle);
+          kakao.maps.event.removeListener(map.current, "click", onMapCanvasClick);
 
           if (idleId.current) {
             clearTimeout(idleId.current);
             idleId.current = null;
           }
-        
         };
       });
     };
@@ -469,7 +469,6 @@ export default function Page() {
       cleanupRef.current?.(); // ✅ 누수 방지
     };
   }, []);
-
 
   return (
     <div>
@@ -571,4 +570,3 @@ export default function Page() {
     </div>
   );
 }
-
