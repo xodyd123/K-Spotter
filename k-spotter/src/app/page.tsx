@@ -1,11 +1,12 @@
 // app/page.tsx
 "use client";
 
-import { useEffect, useInsertionEffect, useRef, useState } from "react";
-import { Place } from "../../type/type";
+import { useCallback, useEffect, useInsertionEffect, useRef, useState } from "react";
+import { ca, Place } from "../../type/type";
 import MarkerDetail from "./components/markerDetail";
 import { createRoot, Root } from "react-dom/client";
-import CategoryCheckList from "./components/categoryCheck";
+import SearchBar from "./components/searchBar";
+import CategoryRow from "./components/categoryRow";
 
 declare global {
   interface Window {
@@ -38,7 +39,7 @@ export default function Page() {
     return query || fromStore;
   });
 
-  const [userCategory, setCategory] = useState({
+  const [userCategory, setCategory] = useState<Record<ca, boolean>>({
     Drama: false,
     Movie: false,
     MusicVideo: false,
@@ -48,9 +49,9 @@ export default function Page() {
   const [showSpinner, setShowSpinner] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const delayT = useRef<number | null>(null);
-  const categories = ["Drama", "Movie", "MusicVideo"] as const;
+  
 
-  type ca = "Drama" | "Movie" | "MusicVideo";
+
   const map = useRef<any>(null);
 
   const markersRef = useRef<any>([]);
@@ -63,6 +64,14 @@ export default function Page() {
   const defer = (fn: () => void) => queueMicrotask(fn);
 
   const reqSeq = useRef(0);
+
+  const onCategoryClick = useCallback((cat : ca) => {
+    setCategory((prev) => ({ ...prev, [cat]: !prev[cat] }));
+
+  } , [])
+  
+
+
 
   function closeOverlay() {
     // 1) 지도에서 먼저 떼기(동기 OK)
@@ -84,12 +93,6 @@ export default function Page() {
     infoRoot.current = null;
   };
 
-  const selectAll = () => {
-    setCategory({ Drama: true, Movie: true, MusicVideo: true });
-  };
-
-  const clearAll = () =>
-    setCategory({ Drama: false, Movie: false, MusicVideo: false });
 
   const clearDelay = () => {
     if (delayT.current) {
@@ -264,9 +267,7 @@ export default function Page() {
     };
   }, [userCategory]);
 
-  const onCategoryClick = (item: ca) => {
-    setCategory((prev) => ({ ...prev, [item]: !prev[item] }));
-  };
+
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -375,7 +376,7 @@ export default function Page() {
               position: new kakao.maps.LatLng(item.lat, item.lng),
               map: map.current,
               title: item.title,
-              category: item.category,
+            
             });
 
             const handler = () => {
@@ -471,54 +472,25 @@ export default function Page() {
   }, []);
 
   return (
-    <div>
+    <div className="">
+      <SearchBar/> 
       <div
-        className="fixed left-1/2 top-[max(env(safe-area-inset-top),0.5rem)] -translate-x-1/2 z-20
+        className="fixed left-1/2 bottom-[max(env(safe-area-inset-top),0.5rem)] -translate-x-1/2 z-20
              w-[min(92%,720px)] px-2"
       >
         <div
           className="rounded-2xl bg-white/80 backdrop-blur-md shadow-lg border border-white/60
                   px-3 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar"
         >
-          {/* 추가: 전체/초기화 칩 */}
-          <button
-            onClick={selectAll}
-            className="px-3 py-1.5 rounded-full text-sm border bg-white/70 hover:bg-gray-100
-                 text-gray-800 border-gray-300 transition-colors"
-          >
-            전체 선택
-          </button>
-          <button
-            onClick={clearAll}
-            className="px-3 py-1.5 rounded-full text-sm border bg-white/70 hover:bg-gray-100
-                 text-gray-800 border-gray-300 transition-colors"
-          >
-            초기화
-          </button>
+ 
 
-          {/* 기존 카테고리 칩들 */}
-          <div className="flex gap-1.5">
-            {categories.map((item, idx) => {
-              const on = userCategory[item];
-              return (
-                <button
-                  key={`category-${idx}`}
-                  disabled={loading}
-                  onClick={() => onCategoryClick(item)}
-                  aria-pressed={on}
-                  className={[
-                    "px-3 py-1.5 rounded-full text-sm whitespace-nowrap border transition-colors",
-                    on
-                      ? "bg-black text-white border-black shadow-sm"
-                      : "bg-white/70 text-gray-800 border-gray-300 hover:bg-gray-100",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-black/60",
-                  ].join(" ")}
-                >
-                  {item}
-                </button>
-              );
-            })}
-          </div>
+  
+        {/* 3) 여기서 CategoryRow “호출”(렌더링) */}
+        <CategoryRow
+          userCategory={userCategory}
+          loading={loading}
+          onCategoryClick={onCategoryClick}
+        />
           <div className="ml-auto">
             {showSpinner && (
               <span className="text-xs text-black">불러오는 중…</span>
