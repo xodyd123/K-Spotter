@@ -18,3 +18,5 @@ export enum category{
 
 }
 
+
+export type ca =  "Drama" | "Movie" | "MusicVideo";
