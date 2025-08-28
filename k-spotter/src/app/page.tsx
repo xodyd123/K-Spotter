@@ -4,7 +4,6 @@
 import {
   useCallback,
   useEffect,
-  useInsertionEffect,
   useRef,
   useState,
 } from "react";
@@ -108,42 +107,35 @@ export default function Page() {
 
   async function fetchPlacesForBBox(bbox: BBox) {
     const id = ++reqSeq.current;
-
-    // 진행 중 요청 취소
+  
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-
+  
     setLoading(true);
     setLoadError(null);
     clearDelay();
     const myDelayId = window.setTimeout(() => setShowSpinner(true), 300);
     delayT.current = myDelayId;
-
+  
     try {
-      const param = new URLSearchParams();
-      Object.entries(userCategory)
-        .filter(([, v]) => v)
-        .forEach(([k]) => param.append("category", k));
-      param.append("bbox", bboxToString(bbox));
-
-      const res = await fetch(`/api/places?${param.toString()}`, {
-        signal: ac.signal,
-      });
-      console.log(res);
+      const qs = new URLSearchParams();
+      Object.entries(userCategory).filter(([, v]) => v).forEach(([k]) => qs.append("category", k));
+      qs.append("bbox", bboxToString(bbox));
+  
+      const res = await fetch(`/api/places?${qs.toString()}`, { signal: ac.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
       const payload = await res.json();
-
       const places: Place[] = Array.isArray(payload) ? payload : payload.items;
-
-      if (id !== reqSeq.current) return; // 오래된 응답 무시
-
-      // 기존 마커 제거 후 교체 (당신이 가진 로직 재사용)
+  
+      if (id !== reqSeq.current) return;
+  
+      // 기존 마커 정리
       closeOverlay();
       markersRef.current.forEach((m: any) => m.setMap(null));
       markersRef.current = [];
-
+  
+      // 새 마커 + 클릭 핸들러
       const { kakao } = window as any;
       markersRef.current = places.map((item) => {
         const marker = new kakao.maps.Marker({
@@ -151,19 +143,48 @@ export default function Page() {
           map: map.current,
           title: item.title,
         });
-        // ... 클릭 핸들러 바인딩은 기존과 동일
+  
+        const handler = () => {
+          if (infoRoot.current) {
+            closeOverlay();
+            infoRoot.current = null;
+          }
+          const container = document.createElement("div");
+          container.className = "marker-overlay";
+          infoRoot.current = createRoot(container);
+          infoRoot.current.render(<MarkerDetail item={item} onClose={onMapClick} />);
+  
+          if (!overlayRef.current) {
+            overlayRef.current = new kakao.maps.CustomOverlay({
+              content: container,
+              position: marker.getPosition(),
+              xAnchor: 0.5,
+              yAnchor: 1,
+              zIndex: 3,
+              clickable: true,
+            });
+          } else {
+            overlayRef.current.setContent(container);
+            overlayRef.current.setPosition(marker.getPosition());
+            overlayRef.current.setZIndex(3);
+          }
+          overlayRef.current?.setMap(map.current);
+        };
+  
+        kakao.maps.event.addListener(marker, "click", handler);
         return marker;
       });
-
-      // ✅ 성공 시 “마지막 조회 BBox”를 갱신 (다음 비교에 사용)
+  
+      // ✅ 상태 갱신
       lastFetchedBboxRef.current = bbox;
+      setMarkerCount(places.length);
+      setFetchedMarker(true);
     } catch (e: any) {
       if (e.name !== "AbortError") setLoadError("불러오기 실패");
     } finally {
       if (id === reqSeq.current) {
         setLoading(false);
         if (delayT.current === myDelayId) {
-          // 이 요청이 만든 지연 스피너만 해제
           clearTimeout(myDelayId);
           delayT.current = null;
           setShowSpinner(false);
@@ -171,6 +192,7 @@ export default function Page() {
       }
     }
   }
+  
 
   const onMapClick = () => {
     const ov = overlayRef.current;
@@ -244,135 +266,18 @@ export default function Page() {
 
   useEffect(() => {
     if (!map.current) return;
-    const { kakao } = window;
+      
+    const cur = boxRef.current ?? readMapBBox(map.current);
+    if (!cur) return;
+    fetchPlacesForBBox(cur);   
+    
 
-    const offHandlers: Array<() => void> = [];
-
-    closeOverlay();
-    markersRef.current.forEach((item) => item.setMap(null));
-    markersRef.current = [];
-
-    const id = ++reqSeq.current;
-    const ac = new AbortController();
-
-   
-    clearDelay();
-    const myDelayId = window.setTimeout(() => setShowSpinner(true), 300);
-    delayT.current = myDelayId;
-
-    const func = async () => {
-      try {
-        const param = new URLSearchParams();
-
-        Object.entries(userCategory)
-          .filter(([_, v]) => v)
-          .forEach(([k]) => param.append("category", k));
-        const res = await fetch(`/api/places?${param.toString()}`, {
-          signal: ac.signal,
-        });
-
-        const places: Place[] = await res.json();
-
-        if (!mapRef.current) return; // 언마운트 방어
-
-        if (id !== reqSeq.current) return; // <- 오래된 응답 무시
-
-        markersRef.current = places.map((item) => {
-          const marker = new kakao.maps.Marker({
-            position: new kakao.maps.LatLng(item.lat, item.lng),
-            map: map.current,
-            title: item.title,
-          });
-
-          const handler = () => {
-            //  이전 루트 정리
-            if (infoRoot.current) {
-              closeOverlay();
-              infoRoot.current = null;
-            }
-
-            const container = document.createElement("div");
-            container.className = "marker-overlay"; // CSS용
-
-            // 컨테이너 div 생성
-            // React Root로 MarkerDetail 렌더
-            infoRoot.current = createRoot(container);
-            infoRoot.current.render(
-              <MarkerDetail item={item} onClose={onMapClick} />
-            );
-
-            // 오버레이 생성
-            if (!overlayRef.current) {
-              overlayRef.current = new kakao.maps.CustomOverlay({
-                content: container,
-                position: marker.getPosition(),
-                xAnchor: 0.5,
-                yAnchor: 1,
-                zIndex: 3,
-                clickable: true, // 오버레이 위 UI 클릭이 지도에 먹히지 않도록
-              });
-            } else {
-              overlayRef.current.setContent(container);
-              overlayRef.current.setPosition(marker.getPosition());
-              overlayRef.current.setZIndex(3);
-            }
-
-            overlayRef.current?.setMap(map.current);
-          };
-
-          kakao.maps.event.addListener(marker, "click", handler);
-
-          offHandlers.push(() =>
-            kakao.maps.event.removeListener(marker, "click", handler)
-          );
-
-          return marker;
-        });
-
-        // (선택) 전체 보이게 맞추기
-        if (markersRef.current.length > 1) {
-          const bounds = new kakao.maps.LatLngBounds();
-          markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
-          fitBoundsOnce(bounds);
-        }
-      } catch (e: any) {
-        if (e.name !== "AbortError") setLoadError("불러오기 실패");
-      } finally {
-        if (id === reqSeq.current) {
-          setLoading(false);
-          // 이 요청이 만든 지연 타이머만 해제 + 스피너 끄기
-          if (delayT.current === myDelayId) {
-            clearTimeout(myDelayId);
-            delayT.current = null;
-            setShowSpinner(false);
-          }
-        }
-      }
-      setFetchedMarker(markersRef.current); 
-    };
-
-    func();
-
-    return () => {
-      ac.abort();
-      offHandlers.forEach((off) => off());
-      markersRef.current.forEach((m) => m.setMap(null));
-      markersRef.current = [];
-      closeOverlay();
-
-      // 이 요청이 만든 타이머만 해제
-      if (delayT.current === myDelayId) {
-        clearTimeout(myDelayId);
-        delayT.current = null;
-        setShowSpinner(false);
-      }
-    };
   }, [userCategory]);
 
   useEffect(() => {
     if (!mapRef.current) return;
 
-    console.log(markersRef.current.length) ; 
+  
     const init = () => {
       if (!window.kakao?.maps) return;
       if (initializedRef.current) return; // ✅ 중복 방지
@@ -420,11 +325,13 @@ export default function Page() {
           }
 
           idleId.current = window.setTimeout(() => {
-            if (!autoSearch) return; // ✅ 자동 모드가 아니면 요청 안 함
-
+           
+            // if (!autoSearch) return; // ✅ 자동 모드가 아니면 요청 안 함
+            
             const cur = boxRef.current; // ← 스냅샷
             if (!cur) return;
             if (!bboxMeaningfullyChanged(cur, lastFetchedBboxRef.current))
+              
               return;
 
             fetchPlacesForBBox(cur);
@@ -472,6 +379,7 @@ export default function Page() {
         
           const res = await fetch("/api/places");
           const places: Place[] = await res.json();
+          
 
           if (!mapRef.current) return; // 언마운트 방어
 
@@ -538,7 +446,7 @@ export default function Page() {
         } catch (e) {
           console.error("Failed to load places", e);
         }
-         setMarkerCount(markersRef.current) ;
+         setMarkerCount(markersRef.current.length) ;
          setFetchedMarker(true) ; 
         // ✅ 정리 루틴 등록
         cleanupRef.current = () => {
@@ -563,6 +471,12 @@ export default function Page() {
             map.current,
             "click",
             onMapCanvasClick
+          );
+
+          kakao.maps.event.removeListener(
+            map.current,
+            "tilesloaded",
+            handleTilesLoaded
           );
 
           if (idleId.current) {
