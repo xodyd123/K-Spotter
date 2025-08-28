@@ -1,8 +1,14 @@
 // app/page.tsx
 "use client";
 
-import { useCallback, useEffect, useInsertionEffect, useRef, useState } from "react";
-import { ca, Place } from "../../type/type";
+import {
+  useCallback,
+  useEffect,
+  useInsertionEffect,
+  useRef,
+  useState,
+} from "react";
+import { BBox, ca, LatLng, Place } from "../../type/type";
 import MarkerDetail from "./components/markerDetail";
 import { createRoot, Root } from "react-dom/client";
 import SearchBar from "./components/searchBar";
@@ -49,29 +55,45 @@ export default function Page() {
   const [showSpinner, setShowSpinner] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const delayT = useRef<number | null>(null);
-  
-
 
   const map = useRef<any>(null);
-
   const markersRef = useRef<any>([]);
   const userInteractedRef = useRef<boolean>(false);
   const didInitialFitRef = useRef<boolean>(false); // 초기 1회 fitBounds 허용 스위치
   const allowAutoMoveUntilRef = useRef<number>(0); // 초기 자동이동 허용 시간창(ms)
   const programmaticMoveCntRef = useRef<number>(0);
+  const boxRef = useRef<BBox | null>(null);
+  const lastFetchedBboxRef = useRef<BBox | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const [autoSearch, setAutoSearch] = useState(false);
+  
+  const [fetchedMarker, setFetchedMarker] = useState(false);
+  const [markerCount, setMarkerCount] = useState<number | null>(null);
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
 
   const reqSeq = useRef(0);
 
-  const onCategoryClick = useCallback((cat : ca) => {
+  const onCategoryClick = useCallback((cat: ca) => {
     setCategory((prev) => ({ ...prev, [cat]: !prev[cat] }));
+  }, []);
 
-  } , [])
-  
+  const DEBOUNCE_MS = 300;
+  const EPS_CENTER_DEG = 0.0005; // 중심 이동 임계
+  const EPS_AREA_RATIO = 0.02; // 면적 변화 임계 (2%)
 
+  function readMapBBox(m: any): BBox {
+    const b = m.getBounds();
+    const sw = b.getSouthWest();
+    const ne = b.getNorthEast();
+    return { sw: [sw.getLat(), sw.getLng()], ne: [ne.getLat(), ne.getLng()] };
+  }
 
+  function bboxToString(bb: BBox): string {
+    const f = (n: number) => n.toFixed(6);
+    return `${f(bb.sw[0])},${f(bb.sw[1])},${f(bb.ne[0])},${f(bb.ne[1])}`;
+  }
 
   function closeOverlay() {
     // 1) 지도에서 먼저 떼기(동기 OK)
@@ -84,6 +106,72 @@ export default function Page() {
     if (root) defer(() => root.unmount());
   }
 
+  async function fetchPlacesForBBox(bbox: BBox) {
+    const id = ++reqSeq.current;
+
+    // 진행 중 요청 취소
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    setLoading(true);
+    setLoadError(null);
+    clearDelay();
+    const myDelayId = window.setTimeout(() => setShowSpinner(true), 300);
+    delayT.current = myDelayId;
+
+    try {
+      const param = new URLSearchParams();
+      Object.entries(userCategory)
+        .filter(([, v]) => v)
+        .forEach(([k]) => param.append("category", k));
+      param.append("bbox", bboxToString(bbox));
+
+      const res = await fetch(`/api/places?${param.toString()}`, {
+        signal: ac.signal,
+      });
+      console.log(res);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const payload = await res.json();
+
+      const places: Place[] = Array.isArray(payload) ? payload : payload.items;
+
+      if (id !== reqSeq.current) return; // 오래된 응답 무시
+
+      // 기존 마커 제거 후 교체 (당신이 가진 로직 재사용)
+      closeOverlay();
+      markersRef.current.forEach((m: any) => m.setMap(null));
+      markersRef.current = [];
+
+      const { kakao } = window as any;
+      markersRef.current = places.map((item) => {
+        const marker = new kakao.maps.Marker({
+          position: new kakao.maps.LatLng(item.lat, item.lng),
+          map: map.current,
+          title: item.title,
+        });
+        // ... 클릭 핸들러 바인딩은 기존과 동일
+        return marker;
+      });
+
+      // ✅ 성공 시 “마지막 조회 BBox”를 갱신 (다음 비교에 사용)
+      lastFetchedBboxRef.current = bbox;
+    } catch (e: any) {
+      if (e.name !== "AbortError") setLoadError("불러오기 실패");
+    } finally {
+      if (id === reqSeq.current) {
+        setLoading(false);
+        if (delayT.current === myDelayId) {
+          // 이 요청이 만든 지연 스피너만 해제
+          clearTimeout(myDelayId);
+          delayT.current = null;
+          setShowSpinner(false);
+        }
+      }
+    }
+  }
+
   const onMapClick = () => {
     const ov = overlayRef.current;
     if (!ov) return;
@@ -92,7 +180,6 @@ export default function Page() {
     ov?.setContent("");
     infoRoot.current = null;
   };
-
 
   const clearDelay = () => {
     if (delayT.current) {
@@ -114,6 +201,23 @@ export default function Page() {
     map.current.setBounds(bounds);
     didInitialFitRef.current = true; // ✅ 여기서 true로 바꿈 (한 번만 허용)
     return true;
+  };
+
+  const bboxMeaningfullyChanged = (a: BBox | null, b: BBox | null): boolean => {
+    if (!a || !b) return true;
+    // 중심 이동
+    const aC: LatLng = [(a.sw[0] + a.ne[0]) / 2, (a.sw[1] + a.ne[1]) / 2];
+    const bC: LatLng = [(b.sw[0] + b.ne[0]) / 2, (b.sw[1] + b.ne[1]) / 2];
+    const dLat = Math.abs(aC[0] - bC[0]);
+    const dLng = Math.abs(aC[1] - bC[1]);
+    if (dLat > EPS_CENTER_DEG || dLng > EPS_CENTER_DEG) return true;
+
+    // 면적 변화
+    const aArea = (a.ne[0] - a.sw[0]) * (a.ne[1] - a.sw[1]);
+    const bArea = (b.ne[0] - b.sw[0]) * (b.ne[1] - b.sw[1]);
+    if (bArea === 0) return true;
+    const diffRatio = Math.abs(aArea - bArea) / bArea;
+    return diffRatio > EPS_AREA_RATIO;
   };
 
   useEffect(() => {
@@ -151,10 +255,7 @@ export default function Page() {
     const id = ++reqSeq.current;
     const ac = new AbortController();
 
-    // 요청시작
-    setLoading(true);
-    setLoadError(null);
-    setShowSpinner(false); // 새요청을 시작할때 스피너 초기화
+   
     clearDelay();
     const myDelayId = window.setTimeout(() => setShowSpinner(true), 300);
     delayT.current = myDelayId;
@@ -247,6 +348,7 @@ export default function Page() {
           }
         }
       }
+      setFetchedMarker(markersRef.current); 
     };
 
     func();
@@ -267,11 +369,10 @@ export default function Page() {
     };
   }, [userCategory]);
 
-
-
   useEffect(() => {
     if (!mapRef.current) return;
 
+    console.log(markersRef.current.length) ; 
     const init = () => {
       if (!window.kakao?.maps) return;
       if (initializedRef.current) return; // ✅ 중복 방지
@@ -284,6 +385,8 @@ export default function Page() {
           handleTilesLoaded
         );
       };
+
+
 
       window.kakao.maps.load(async () => {
         if (!mapRef.current) return;
@@ -301,12 +404,15 @@ export default function Page() {
         const offHandlers: Array<() => void> = [];
 
         const onIdle = () => {
+          boxRef.current = readMapBBox(map.current);
 
           if (programmaticMoveCntRef.current > 0) {
+            // 이게 없으면 사용자가 직접 줌을 했을때 확대 x
             programmaticMoveCntRef.current = Math.max(
               0,
               programmaticMoveCntRef.current - 1
             );
+            return;
           }
           if (idleId.current) {
             clearTimeout(idleId.current);
@@ -314,19 +420,17 @@ export default function Page() {
           }
 
           idleId.current = window.setTimeout(() => {
-            const b = map.current.getBounds();
-            const sw = b.getSouthWest();
-            const ne = b.getNorthEast();
-            const fmt = (n: number) => n.toFixed(5);
+            if (!autoSearch) return; // ✅ 자동 모드가 아니면 요청 안 함
 
-            setBoundsText(
-              `${fmt(sw.getLat())}, ${fmt(sw.getLng())} ~ ${fmt(
-                ne.getLat()
-              )}, ${fmt(ne.getLng())}`
-            );
+            const cur = boxRef.current; // ← 스냅샷
+            if (!cur) return;
+            if (!bboxMeaningfullyChanged(cur, lastFetchedBboxRef.current))
+              return;
 
-     
-          }, 250);
+            fetchPlacesForBBox(cur);
+
+            setBoundsText(bboxToString(cur));
+          }, DEBOUNCE_MS);
         };
 
         const onDragStart = () => {
@@ -344,9 +448,9 @@ export default function Page() {
         };
 
         const onMapCanvasClick = () => {
-          userInteractedRef.current = true ; 
+          userInteractedRef.current = true;
           onMapClick();
-        }
+        };
 
         kakao.maps.event.addListener(map.current, "click", onMapCanvasClick);
         kakao.maps.event.addListener(map.current, "dragstart", onDragStart);
@@ -365,6 +469,7 @@ export default function Page() {
         onIdle(); //한번 실행
 
         try {
+        
           const res = await fetch("/api/places");
           const places: Place[] = await res.json();
 
@@ -376,7 +481,6 @@ export default function Page() {
               position: new kakao.maps.LatLng(item.lat, item.lng),
               map: map.current,
               title: item.title,
-            
             });
 
             const handler = () => {
@@ -434,7 +538,8 @@ export default function Page() {
         } catch (e) {
           console.error("Failed to load places", e);
         }
-
+         setMarkerCount(markersRef.current) ;
+         setFetchedMarker(true) ; 
         // ✅ 정리 루틴 등록
         cleanupRef.current = () => {
           closeOverlay();
@@ -442,11 +547,23 @@ export default function Page() {
           offHandlers.forEach((off) => off());
           markersRef.current.forEach((m) => m.setMap(null));
           initializedRef.current = false;
-          kakao.maps.event.removeListener(map.current, "click", onMapClick);
-          kakao.maps.event.removeListener(map.current, "dragstart", onDragStart);
-          kakao.maps.event.removeListener(map.current, "zoom_changed",onZoomChanged);
+
+          kakao.maps.event.removeListener(
+            map.current,
+            "dragstart",
+            onDragStart
+          );
+          kakao.maps.event.removeListener(
+            map.current,
+            "zoom_changed",
+            onZoomChanged
+          );
           kakao.maps.event.removeListener(map.current, "idle", onIdle);
-          kakao.maps.event.removeListener(map.current, "click", onMapCanvasClick);
+          kakao.maps.event.removeListener(
+            map.current,
+            "click",
+            onMapCanvasClick
+          );
 
           if (idleId.current) {
             clearTimeout(idleId.current);
@@ -465,6 +582,8 @@ export default function Page() {
     window.addEventListener("kakao:loaded", onLoaded);
 
     return () => {
+
+     
       window.removeEventListener("kakao:loaded", onLoaded);
 
       cleanupRef.current?.(); // ✅ 누수 방지
@@ -473,7 +592,7 @@ export default function Page() {
 
   return (
     <div className="">
-      <SearchBar/> 
+      <SearchBar />
       <div
         className="fixed left-1/2 bottom-[max(env(safe-area-inset-top),0.5rem)] -translate-x-1/2 z-20
              w-[min(92%,720px)] px-2"
@@ -482,21 +601,18 @@ export default function Page() {
           className="rounded-2xl bg-white/80 backdrop-blur-md shadow-lg border border-white/60
                   px-3 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar"
         >
- 
-
-  
-        {/* 3) 여기서 CategoryRow “호출”(렌더링) */}
-        <CategoryRow
-          userCategory={userCategory}
-          loading={loading}
-          onCategoryClick={onCategoryClick}
-        />
+          {/* 3) 여기서 CategoryRow “호출”(렌더링) */}
+          <CategoryRow
+            userCategory={userCategory}
+            loading={loading}
+            onCategoryClick={onCategoryClick}
+          />
           <div className="ml-auto">
             {showSpinner && (
               <span className="text-xs text-black">불러오는 중…</span>
             )}
           </div>
-          {!loading && !loadError && markersRef.current.length === 0 && (
+          {!loading && !loadError && fetchedMarker && markerCount === 0 && (
             <div className="text-xs px-2 py-1 rounded bg-black border">
               이 범위에는 결과가 없어요
             </div>
@@ -510,7 +626,7 @@ export default function Page() {
       </div>
 
       <div className="relative w-full h-screen">
-        <div ref={mapRef} className="absolute inset-0" />
+        <div ref={mapRef} className="absolute inset-0" /> {/* 처음 지도 로딩 창 스켈레톤 */}
 
         {/* 처음 지도 타일 스켈레톤 */}
         {!mapReady && (
@@ -533,6 +649,7 @@ export default function Page() {
           </div>
         )}
       </div>
+
 
       {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">

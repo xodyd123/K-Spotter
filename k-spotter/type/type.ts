@@ -20,3 +20,8 @@ export enum category{
 
 
 export type ca =  "Drama" | "Movie" | "MusicVideo";
+
+export type LatLng = [lat: number, lng: number];
+export type BBox = { sw: LatLng; ne: LatLng };
+
+
