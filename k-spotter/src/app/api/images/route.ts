@@ -1,4 +1,4 @@
-import { console } from "inspector";
+
 import { NextRequest, NextResponse } from "next/server";
 
 const BASE = "https://apis.data.go.kr/B551011/PhotoGalleryService1/gallerySearchList1";

@@ -27,6 +27,7 @@ export default function MarkerDetail({
           { signal: ac.signal } 
         
         );
+
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json();
        

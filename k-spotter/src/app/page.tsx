@@ -12,6 +12,7 @@ import MarkerDetail from "./components/markerDetail";
 import { createRoot, Root } from "react-dom/client";
 import SearchBar from "./components/searchBar";
 import CategoryRow from "./components/categoryRow";
+import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
 
 declare global {
   interface Window {
@@ -56,7 +57,7 @@ export default function Page() {
   const delayT = useRef<number | null>(null);
 
   const map = useRef<any>(null);
-  const markersRef = useRef<any>([]);
+  const markersRef = useRef<any[]>([]);
   const userInteractedRef = useRef<boolean>(false);
   const didInitialFitRef = useRef<boolean>(false); // 초기 1회 fitBounds 허용 스위치
   const allowAutoMoveUntilRef = useRef<number>(0); // 초기 자동이동 허용 시간창(ms)
@@ -71,7 +72,8 @@ export default function Page() {
   const radiusCircleRef = useRef<any|null>(null);
   const radiusLabelRef  = useRef<any|null>(null);
   const [radiusM, setRadiusM] = useState(2000);
- 
+  const nearbyMarkersRef = useRef<any[]>([]);
+  const nearbyAbortRef = useRef<AbortController | null>(null);
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
@@ -147,7 +149,49 @@ export default function Page() {
     // radiusLabelRef.current = label;
   }
 
-  async function fetchPlacesForBBox(bbox: BBox) {
+  function clearNearbyMarkers(){
+    nearbyMarkersRef.current.forEach(m => m.setMap(null));
+    nearbyMarkersRef.current = [];
+    nearbyAbortRef.current?.abort();
+    nearbyAbortRef.current = null;
+  }
+
+  async function renderNearbyMarkers(center: {lat:number, lng:number}, radius = radiusM) {
+    const { kakao } = window as any;
+  
+    // 취소 준비
+    nearbyAbortRef.current?.abort();
+    const ac = new AbortController();
+    nearbyAbortRef.current = ac;
+  
+    try {
+      const result = await getNearbyPlaces({
+        lat: center.lat, lng: center.lng,
+        radius, cats: ["food","cafe","attraction"], sort: "reco"
+      });
+
+      const {items ,count} = result ; 
+      // 결과로 마커 생성
+      const markers = items.map((it:any) => {
+        const marker = new kakao.maps.Marker({
+          position: new kakao.maps.LatLng(it.lat, it.lng),
+          map: map.current,
+          title: it.title,
+          zIndex: 2,
+        });
+        return marker;
+      });
+      nearbyMarkersRef.current = markers; 
+      
+    } catch (e:any) {
+      if (e.name !== "AbortError") console.error("nearby load failed", e);
+    }
+  }
+
+  async function fetchPlacesForBBox(bbox: BBox) { 
+
+    
+    
     const id = ++reqSeq.current;
   
     abortRef.current?.abort();
@@ -174,9 +218,13 @@ export default function Page() {
   
       // 기존 마커 정리
       closeOverlay();
+      
+   
       markersRef.current.forEach((m: any) => m.setMap(null));
+      
+     
       markersRef.current = [];
-  
+
       // 새 마커 + 클릭 핸들러
       const { kakao } = window as any;
       markersRef.current = places.map((item) => {
@@ -186,8 +234,11 @@ export default function Page() {
           title: item.title,
         });
   
-        const handler = () => {
+        const handler =async () => {
+         
+         
           if (infoRoot.current) {
+         
             closeOverlay();
             infoRoot.current = null;
           }
@@ -195,8 +246,8 @@ export default function Page() {
           container.className = "marker-overlay";
           infoRoot.current = createRoot(container);
           infoRoot.current.render(<MarkerDetail item={item} onClose={onMapClick} />);
-  
-          if (!overlayRef.current) {
+          
+          if (!overlayRef.current) { 
             overlayRef.current = new kakao.maps.CustomOverlay({
               content: container,
               position: marker.getPosition(),
@@ -211,25 +262,27 @@ export default function Page() {
             overlayRef.current.setZIndex(3);
           }
           overlayRef.current?.setMap(map.current);
-          const pos = marker.getPosition();
-        
+          const pos = marker.getPosition(); 
+         
           clearRadiusRing();                 // 이전 링 지우기 (ref 사용)
           drawRadiusRing(pos, radiusM);   
-
+          // 이전 보조 마커 정리 후 새로 렌더
+          clearNearbyMarkers();
+          await renderNearbyMarkers({ lat: item.lat, lng: item.lng }, radiusM);
           
+      }
+      kakao.maps.event.addListener(marker, "click", handler );
+      return marker;
+    
+    });
 
 
-        };
-  
-        kakao.maps.event.addListener(marker, "click", handler);
-        return marker;
-      });
-  
       // ✅ 상태 갱신
       lastFetchedBboxRef.current = bbox;
       setMarkerCount(places.length);
       setFetchedMarker(true);
     } catch (e: any) {
+      console.log(e); 
       if (e.name !== "AbortError") setLoadError("불러오기 실패");
     } finally {
       if (id === reqSeq.current) {
@@ -245,6 +298,7 @@ export default function Page() {
   
 
   const onMapClick = () => {
+   
     const ov = overlayRef.current;
     if (!ov) return;
     ov?.setMap(null);
@@ -316,6 +370,7 @@ export default function Page() {
 
   useEffect(() => {
     if (!map.current) return;
+
       
     const cur = boxRef.current ?? readMapBBox(map.current);
     if (!cur) return;
@@ -408,6 +463,7 @@ export default function Page() {
           userInteractedRef.current = true;
           onMapClick();
           clearRadiusRing();  
+          clearNearbyMarkers();
         };
 
         kakao.maps.event.addListener(map.current, "click", onMapCanvasClick);
@@ -424,85 +480,7 @@ export default function Page() {
           handleTilesLoaded
         );
 
-        onIdle(); //한번 실행
-
-        try {
-        
-          const res = await fetch("/api/places");
-          const places: Place[] = await res.json();
-          
-
-          if (!mapRef.current) return; // 언마운트 방어
-
-          // ✅ 마커마다 개별 리스너 등록
-          markersRef.current = places.map((item) => {
-            const marker = new kakao.maps.Marker({
-              position: new kakao.maps.LatLng(item.lat, item.lng),
-              map: map.current,
-              title: item.title,
-            });
-
-            const handler = () => {
-              //  이전 루트 정리
-              if (infoRoot.current) {
-                closeOverlay();
-                infoRoot.current = null;
-              }
-
-              const container = document.createElement("div");
-              container.className = "marker-overlay"; // CSS용
-
-              // 컨테이너 div 생성
-              // React Root로 MarkerDetail 렌더
-              infoRoot.current = createRoot(container);
-              infoRoot.current.render(
-                <MarkerDetail item={item} onClose={onMapClick} />
-              );
-
-              // 오버레이 생성
-              if (!overlayRef.current) {
-                overlayRef.current = new kakao.maps.CustomOverlay({
-                  content: container,
-                  position: marker.getPosition(),
-                  xAnchor: 0.5,
-                  yAnchor: 1,
-                  zIndex: 3,
-                  clickable: true, // 오버레이 위 UI 클릭이 지도에 먹히지 않도록
-                });
-              } else {
-                overlayRef.current.setContent(container);
-                overlayRef.current.setPosition(marker.getPosition());
-                overlayRef.current.setZIndex(3);
-              }
-
-              overlayRef.current?.setMap(map.current);
-              const pos = marker.getPosition();
-              clearRadiusRing();                 // 이전 링 지우기 (ref 사용)
-              drawRadiusRing(pos, radiusM);      // 새 링 그리기
-            
-            };
-
-            kakao.maps.event.addListener(marker, "click", handler);
-
-            offHandlers.push(() =>
-              kakao.maps.event.removeListener(marker, "click", handler)
-            );
-
-            return marker;
-          });
-
-          // (선택) 전체 보이게 맞추기
-          if (markersRef.current.length > 1) {
-            const bounds = new kakao.maps.LatLngBounds();
-            markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
-            // (교체)
-            fitBoundsOnce(bounds); // 초기 1회/허용 창 내/미개입일 때만 실행, 그 외엔 조용히 무시
-          }
-        } catch (e) {
-          console.error("Failed to load places", e);
-        }
-         setMarkerCount(markersRef.current.length) ;
-         setFetchedMarker(true) ; 
+        onIdle(); //한번 실행 
         // ✅ 정리 루틴 등록
         cleanupRef.current = () => {
           closeOverlay();
@@ -510,6 +488,7 @@ export default function Page() {
           offHandlers.forEach((off) => off());
           markersRef.current.forEach((m) => m.setMap(null));
           initializedRef.current = false;
+          clearNearbyMarkers(); 
 
           kakao.maps.event.removeListener(
             map.current,
