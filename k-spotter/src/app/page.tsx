@@ -1,13 +1,8 @@
 // app/page.tsx
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import { BBox, ca, LatLng, Place } from "../../type/type";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { BBox, ca, LatLng, Pins, Place } from "../../type/type";
 import MarkerDetail from "./components/markerDetail";
 import { createRoot, Root } from "react-dom/client";
 import SearchBar from "./components/searchBar";
@@ -65,15 +60,16 @@ export default function Page() {
   const boxRef = useRef<BBox | null>(null);
   const lastFetchedBboxRef = useRef<BBox | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  
-  const [fetchedMarker, setFetchedMarker] = useState(false);
-  const [markerCount, setMarkerCount] = useState<number | null>(null); 
 
-  const radiusCircleRef = useRef<any|null>(null);
-  const radiusLabelRef  = useRef<any|null>(null);
+  const [fetchedMarker, setFetchedMarker] = useState(false);
+  const [markerCount, setMarkerCount] = useState<number | null>(null);
+
+  const radiusCircleRef = useRef<any | null>(null);
+  const radiusLabelRef = useRef<any | null>(null);
   const [radiusM, setRadiusM] = useState(2000);
   const nearbyMarkersRef = useRef<any[]>([]);
-  const nearbyAbortRef = useRef<AbortController | null>(null);
+  const nearbyAbortRef = useRef<AbortController | null>(null);// 컴포넌트 최상단
+  const pinRef = useRef<Pins | null>(null);
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
@@ -114,28 +110,27 @@ export default function Page() {
   function clearRadiusRing() {
     radiusCircleRef.current?.setMap(null);
     radiusCircleRef.current = null;
-
   }
 
   function drawRadiusRing(center: any, rM = radiusM) {
     const { kakao } = window as any;
     clearRadiusRing();
-  
+
     // 링(원)
     const circle = new kakao.maps.Circle({
-      center,               // kakao.maps.LatLng
-      radius: rM,           // 미터
+      center, // kakao.maps.LatLng
+      radius: rM, // 미터
       strokeWeight: 2,
-      strokeColor: '#6D28D9',
+      strokeColor: "#6D28D9",
       strokeOpacity: 0.9,
-      strokeStyle: 'solid',
-      fillColor: '#6D28D9',
+      strokeStyle: "solid",
+      fillColor: "#6D28D9",
       fillOpacity: 0.08,
       zIndex: 1,
     });
     circle.setMap(map.current);
     radiusCircleRef.current = circle;
-  
+
     // // 라벨(옵션)
     // const el = document.createElement('div');
     // el.className = 'rounded-full bg-black/70 text-white text-[11px] px-2 py-1 shadow';
@@ -149,30 +144,36 @@ export default function Page() {
     // radiusLabelRef.current = label;
   }
 
-  function clearNearbyMarkers(){
-    nearbyMarkersRef.current.forEach(m => m.setMap(null));
+  function clearNearbyMarkers() {
+    nearbyMarkersRef.current.forEach((m) => m.setMap(null));
     nearbyMarkersRef.current = [];
     nearbyAbortRef.current?.abort();
     nearbyAbortRef.current = null;
   }
 
-  async function renderNearbyMarkers(center: {lat:number, lng:number}, radius = radiusM) {
+  async function renderNearbyMarkers(
+    center: { lat: number; lng: number },
+    radius = radiusM
+  ) {
     const { kakao } = window as any;
-  
+
     // 취소 준비
     nearbyAbortRef.current?.abort();
     const ac = new AbortController();
     nearbyAbortRef.current = ac;
-  
+
     try {
       const result = await getNearbyPlaces({
-        lat: center.lat, lng: center.lng,
-        radius, cats: ["food","cafe","attraction"], sort: "reco"
+        lat: center.lat,
+        lng: center.lng,
+        radius,
+        cats: ["food", "cafe", "attraction"],
+        sort: "reco",
       });
 
-      const {items ,count} = result ; 
+      const { items, count } = result;
       // 결과로 마커 생성
-      const markers = items.map((it:any) => {
+      const markers = items.map((it: any) => {
         const marker = new kakao.maps.Marker({
           position: new kakao.maps.LatLng(it.lat, it.lng),
           map: map.current,
@@ -181,73 +182,74 @@ export default function Page() {
         });
         return marker;
       });
-      nearbyMarkersRef.current = markers; 
-      
-    } catch (e:any) {
+      nearbyMarkersRef.current = markers;
+    } catch (e: any) {
       if (e.name !== "AbortError") console.error("nearby load failed", e);
     }
   }
 
-  async function fetchPlacesForBBox(bbox: BBox) { 
-
-    
-    
+  async function fetchPlacesForBBox(bbox: BBox) {
     const id = ++reqSeq.current;
-  
+
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-  
+
     setLoading(true);
     setLoadError(null);
     clearDelay();
     const myDelayId = window.setTimeout(() => setShowSpinner(true), 300);
     delayT.current = myDelayId;
-  
+
     try {
       const qs = new URLSearchParams();
-      Object.entries(userCategory).filter(([, v]) => v).forEach(([k]) => qs.append("category", k));
+      Object.entries(userCategory)
+        .filter(([, v]) => v)
+        .forEach(([k]) => qs.append("category", k));
       qs.append("bbox", bboxToString(bbox));
-  
-      const res = await fetch(`/api/places?${qs.toString()}`, { signal: ac.signal });
+
+      const res = await fetch(`/api/places?${qs.toString()}`, {
+        signal: ac.signal,
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const payload = await res.json();
       const places: Place[] = Array.isArray(payload) ? payload : payload.items;
-  
+
       if (id !== reqSeq.current) return;
-  
+
       // 기존 마커 정리
       closeOverlay();
-      
-   
+
       markersRef.current.forEach((m: any) => m.setMap(null));
-      
-     
+
       markersRef.current = [];
 
       // 새 마커 + 클릭 핸들러
       const { kakao } = window as any;
+
       markersRef.current = places.map((item) => {
+        const img =
+        pinRef.current?.[item.category as ca] ?? undefined; // 카테고리별 아이콘
         const marker = new kakao.maps.Marker({
           position: new kakao.maps.LatLng(item.lat, item.lng),
           map: map.current,
           title: item.title,
+          image: img, // 👈 중요: 실제로 여기 넣어야 보입니다
         });
-  
-        const handler =async () => {
-         
-         
+
+        const handler = async () => {
           if (infoRoot.current) {
-         
             closeOverlay();
             infoRoot.current = null;
           }
           const container = document.createElement("div");
           container.className = "marker-overlay";
           infoRoot.current = createRoot(container);
-          infoRoot.current.render(<MarkerDetail item={item} onClose={onMapClick} />);
-          
-          if (!overlayRef.current) { 
+          infoRoot.current.render(
+            <MarkerDetail item={item} onClose={onMapClick} />
+          );
+
+          if (!overlayRef.current) {
             overlayRef.current = new kakao.maps.CustomOverlay({
               content: container,
               position: marker.getPosition(),
@@ -262,27 +264,24 @@ export default function Page() {
             overlayRef.current.setZIndex(3);
           }
           overlayRef.current?.setMap(map.current);
-          const pos = marker.getPosition(); 
-         
-          clearRadiusRing();                 // 이전 링 지우기 (ref 사용)
-          drawRadiusRing(pos, radiusM);   
+          const pos = marker.getPosition();
+
+          clearRadiusRing(); // 이전 링 지우기 (ref 사용)
+          drawRadiusRing(pos, radiusM);
           // 이전 보조 마커 정리 후 새로 렌더
           clearNearbyMarkers();
           await renderNearbyMarkers({ lat: item.lat, lng: item.lng }, radiusM);
-          
-      }
-      kakao.maps.event.addListener(marker, "click", handler );
-      return marker;
-    
-    });
-
+        };
+        kakao.maps.event.addListener(marker, "click", handler);
+        return marker;
+      });
 
       // ✅ 상태 갱신
       lastFetchedBboxRef.current = bbox;
       setMarkerCount(places.length);
       setFetchedMarker(true);
     } catch (e: any) {
-      console.log(e); 
+      console.log(e);
       if (e.name !== "AbortError") setLoadError("불러오기 실패");
     } finally {
       if (id === reqSeq.current) {
@@ -295,10 +294,8 @@ export default function Page() {
       }
     }
   }
-  
 
   const onMapClick = () => {
-   
     const ov = overlayRef.current;
     if (!ov) return;
     ov?.setMap(null);
@@ -371,21 +368,20 @@ export default function Page() {
   useEffect(() => {
     if (!map.current) return;
 
-      
     const cur = boxRef.current ?? readMapBBox(map.current);
     if (!cur) return;
-    fetchPlacesForBBox(cur);   
-    
-
+    fetchPlacesForBBox(cur);
   }, [userCategory]);
 
   useEffect(() => {
     if (!mapRef.current) return;
 
-  
     const init = () => {
       if (!window.kakao?.maps) return;
       if (initializedRef.current) return; // ✅ 중복 방지
+
+  
+
       initializedRef.current = true;
       const handleTilesLoaded = () => {
         setMapReady(true);
@@ -396,18 +392,29 @@ export default function Page() {
         );
       };
 
-
-
       window.kakao.maps.load(async () => {
         if (!mapRef.current) return;
 
         const { kakao } = window;
+
+        const mk = (src: string, w = 28, h = 38) =>
+          new kakao.maps.MarkerImage(src, new kakao.maps.Size(w, h), {
+            offset: new kakao.maps.Point(w / 2, h),
+          });
 
         // 지도 생성
         map.current = new kakao.maps.Map(mapRef.current, {
           center: new kakao.maps.LatLng(37.5665, 126.978),
           level: 5,
         });
+
+        const PIN = {
+          Movie: mk("/pins/movie.svg"),
+          Drama: mk("/pins/drama.svg"),
+          MusicVideo: mk("/pins/music.svg"),
+          selected: mk("/pins/selected.svg", 30, 42),
+        };
+        pinRef.current = PIN;
 
         allowAutoMoveUntilRef.current = Date.now() + 5000;
 
@@ -430,13 +437,11 @@ export default function Page() {
           }
 
           idleId.current = window.setTimeout(() => {
-           
             // if (!autoSearch) return; // ✅ 자동 모드가 아니면 요청 안 함
-            
+
             const cur = boxRef.current; // ← 스냅샷
             if (!cur) return;
             if (!bboxMeaningfullyChanged(cur, lastFetchedBboxRef.current))
-              
               return;
 
             fetchPlacesForBBox(cur);
@@ -462,7 +467,7 @@ export default function Page() {
         const onMapCanvasClick = () => {
           userInteractedRef.current = true;
           onMapClick();
-          clearRadiusRing();  
+          clearRadiusRing();
           clearNearbyMarkers();
         };
 
@@ -480,7 +485,7 @@ export default function Page() {
           handleTilesLoaded
         );
 
-        onIdle(); //한번 실행 
+        onIdle(); //한번 실행
         // ✅ 정리 루틴 등록
         cleanupRef.current = () => {
           closeOverlay();
@@ -488,7 +493,7 @@ export default function Page() {
           offHandlers.forEach((off) => off());
           markersRef.current.forEach((m) => m.setMap(null));
           initializedRef.current = false;
-          clearNearbyMarkers(); 
+          clearNearbyMarkers();
 
           kakao.maps.event.removeListener(
             map.current,
@@ -530,8 +535,6 @@ export default function Page() {
     window.addEventListener("kakao:loaded", onLoaded);
 
     return () => {
-
-     
       window.removeEventListener("kakao:loaded", onLoaded);
 
       cleanupRef.current?.(); // ✅ 누수 방지
@@ -574,8 +577,8 @@ export default function Page() {
       </div>
 
       <div className="relative w-full h-screen">
-        <div ref={mapRef} className="absolute inset-0" /> {/* 처음 지도 로딩 창 스켈레톤 */}
-
+        <div ref={mapRef} className="absolute inset-0" />{" "}
+        {/* 처음 지도 로딩 창 스켈레톤 */}
         {/* 처음 지도 타일 스켈레톤 */}
         {!mapReady && (
           <div
@@ -589,7 +592,6 @@ export default function Page() {
             <div className="absolute bottom-4 left-4 w-36 h-8 rounded bg-white/70 animate-pulse" />
           </div>
         )}
-
         {/* 데이터 로딩 상태(마커 fetch) */}
         {mapReady && showSpinner && (
           <div className="absolute top-4 right-4 z-30 text-xs px-2 py-1 rounded bg-black/80 text-white">
@@ -597,7 +599,6 @@ export default function Page() {
           </div>
         )}
       </div>
-
 
       {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
