@@ -64,10 +64,14 @@ export default function Page() {
   const boxRef = useRef<BBox | null>(null);
   const lastFetchedBboxRef = useRef<BBox | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [autoSearch, setAutoSearch] = useState(false);
   
   const [fetchedMarker, setFetchedMarker] = useState(false);
-  const [markerCount, setMarkerCount] = useState<number | null>(null);
+  const [markerCount, setMarkerCount] = useState<number | null>(null); 
+
+  const radiusCircleRef = useRef<any|null>(null);
+  const radiusLabelRef  = useRef<any|null>(null);
+  const [radiusM, setRadiusM] = useState(2000);
+ 
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
@@ -103,6 +107,44 @@ export default function Page() {
     const root = infoRoot.current;
     infoRoot.current = null;
     if (root) defer(() => root.unmount());
+  }
+
+  function clearRadiusRing() {
+    radiusCircleRef.current?.setMap(null);
+    radiusCircleRef.current = null;
+
+  }
+
+  function drawRadiusRing(center: any, rM = radiusM) {
+    const { kakao } = window as any;
+    clearRadiusRing();
+  
+    // 링(원)
+    const circle = new kakao.maps.Circle({
+      center,               // kakao.maps.LatLng
+      radius: rM,           // 미터
+      strokeWeight: 2,
+      strokeColor: '#6D28D9',
+      strokeOpacity: 0.9,
+      strokeStyle: 'solid',
+      fillColor: '#6D28D9',
+      fillOpacity: 0.08,
+      zIndex: 1,
+    });
+    circle.setMap(map.current);
+    radiusCircleRef.current = circle;
+  
+    // // 라벨(옵션)
+    // const el = document.createElement('div');
+    // el.className = 'rounded-full bg-black/70 text-white text-[11px] px-2 py-1 shadow';
+    // el.textContent = `반경 ${rM} m`;
+    // const label = new kakao.maps.CustomOverlay({
+    //   content: el,
+    //   position: center,
+    //   xAnchor: -0.05, yAnchor: 1.4, zIndex: 2,
+    // });
+    // label.setMap(map.current);
+    // radiusLabelRef.current = label;
   }
 
   async function fetchPlacesForBBox(bbox: BBox) {
@@ -169,6 +211,14 @@ export default function Page() {
             overlayRef.current.setZIndex(3);
           }
           overlayRef.current?.setMap(map.current);
+          const pos = marker.getPosition();
+        
+          clearRadiusRing();                 // 이전 링 지우기 (ref 사용)
+          drawRadiusRing(pos, radiusM);   
+
+          
+
+
         };
   
         kakao.maps.event.addListener(marker, "click", handler);
@@ -357,6 +407,7 @@ export default function Page() {
         const onMapCanvasClick = () => {
           userInteractedRef.current = true;
           onMapClick();
+          clearRadiusRing();  
         };
 
         kakao.maps.event.addListener(map.current, "click", onMapCanvasClick);
@@ -425,6 +476,10 @@ export default function Page() {
               }
 
               overlayRef.current?.setMap(map.current);
+              const pos = marker.getPosition();
+              clearRadiusRing();                 // 이전 링 지우기 (ref 사용)
+              drawRadiusRing(pos, radiusM);      // 새 링 그리기
+            
             };
 
             kakao.maps.event.addListener(marker, "click", handler);
