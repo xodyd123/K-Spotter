@@ -1,17 +1,16 @@
 // app/page.tsx
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import { BBox, ca, LatLng, Place } from "../../type/type";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { BBox, ca, LatLng, Pins, Place } from "../../type/type";
 import MarkerDetail from "./components/markerDetail";
 import { createRoot, Root } from "react-dom/client";
 import SearchBar from "./components/searchBar";
 import CategoryRow from "./components/categoryRow";
+import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
+import BottomSheet from "./components/bottomSheet";
+import { panWithOffset } from "./service/panWithOffset";
+import { SheetProvider } from "./components/sheetProvider";
 
 declare global {
   interface Window {
@@ -33,7 +32,6 @@ export default function Page() {
   const initializedRef = useRef(false);
   const cleanupRef = useRef<() => void>(() => {});
   const infoRoot = useRef<Root | null>(null);
-  const overlayRef = useRef<CustomOverlayLike | null>(null);
   const [boundsText, setBoundsText] = useState<string>("");
   const idleId = useRef<number | null>(null);
   const [isDev, setIsDev] = useState<boolean>(() => {
@@ -56,18 +54,27 @@ export default function Page() {
   const delayT = useRef<number | null>(null);
 
   const map = useRef<any>(null);
-  const markersRef = useRef<any>([]);
+  const markersRef = useRef<any[]>([]);
   const userInteractedRef = useRef<boolean>(false);
-  const didInitialFitRef = useRef<boolean>(false); // 초기 1회 fitBounds 허용 스위치
   const allowAutoMoveUntilRef = useRef<number>(0); // 초기 자동이동 허용 시간창(ms)
   const programmaticMoveCntRef = useRef<number>(0);
   const boxRef = useRef<BBox | null>(null);
   const lastFetchedBboxRef = useRef<BBox | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [autoSearch, setAutoSearch] = useState(false);
-  
+
   const [fetchedMarker, setFetchedMarker] = useState(false);
   const [markerCount, setMarkerCount] = useState<number | null>(null);
+
+  const radiusCircleRef = useRef<any | null>(null);
+  // const radiusLabelRef = useRef<any | null>(null);
+  const [radiusM, setRadiusM] = useState(2000);
+  const nearbyMarkersRef = useRef<any[]>([]);
+  const nearbyAbortRef = useRef<AbortController | null>(null);// 컴포넌트 최상단
+  const pinRef = useRef<Pins | null>(null); 
+
+  type SheetState =  "closed" | "peek" | "half" | "full" ;
+  const [sheet , setSheet] = useState<SheetState>("closed") ;
+  const [selected , setSelected] = useState<Place|null>(null) ; 
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
@@ -94,92 +101,154 @@ export default function Page() {
     return `${f(bb.sw[0])},${f(bb.sw[1])},${f(bb.ne[0])},${f(bb.ne[1])}`;
   }
 
-  function closeOverlay() {
-    // 1) 지도에서 먼저 떼기(동기 OK)
-    overlayRef.current?.setMap(null);
-    overlayRef.current = null;
+  function clearRadiusRing() {
+    radiusCircleRef.current?.setMap(null);
+    radiusCircleRef.current = null;
+  }
 
-    // 2) React 서브 루트는 "지연 언마운트"
-    const root = infoRoot.current;
-    infoRoot.current = null;
-    if (root) defer(() => root.unmount());
+  function drawRadiusRing(center: any, rM = radiusM) {
+    const { kakao } = window as any;
+    clearRadiusRing();
+
+    // 링(원)
+    const circle = new kakao.maps.Circle({
+      center, // kakao.maps.LatLng
+      radius: rM, // 미터
+      strokeWeight: 2,
+      strokeColor: "#6D28D9",
+      strokeOpacity: 0.9,
+      strokeStyle: "solid",
+      fillColor: "#6D28D9",
+      fillOpacity: 0.08,
+      zIndex: 1,
+    });
+    circle.setMap(map.current);
+    radiusCircleRef.current = circle;
+
+  }
+
+  function clearNearbyMarkers() {
+    nearbyMarkersRef.current.forEach((m) => m.setMap(null));
+    nearbyMarkersRef.current = [];
+    nearbyAbortRef.current?.abort();
+    nearbyAbortRef.current = null;
+  }
+  
+  function onMarkerClick(item : Place , marker : any)  {
+    setSelected(item) ;
+    setSheet("half") ; 
+ 
+
+    const pos = marker.getPosition();
+    // 이미 쓰는 반경링/근처마커 로직 그대로 호출
+    clearRadiusRing(); drawRadiusRing(pos, radiusM);
+    clearNearbyMarkers(); renderNearbyMarkers({lat:item.lat,lng:item.lng}, radiusM);
+  
+    programmaticMoveCntRef.current += 1;
+    panWithOffset(map.current, pos ,Math.round(window.innerHeight * 0.35)) 
+    
+
+  }
+
+  async function renderNearbyMarkers(
+    center: { lat: number; lng: number },
+    radius = radiusM
+  ) {
+    const { kakao } = window as any;
+
+    // 취소 준비
+    nearbyAbortRef.current?.abort();
+    const ac = new AbortController();
+    nearbyAbortRef.current = ac;
+
+    try {
+      const result = await getNearbyPlaces({
+        lat: center.lat,
+        lng: center.lng,
+        radius,
+        cats: ["food", "cafe", "attraction"],
+        sort: "reco",
+      });
+
+      const { items, count } = result;
+      // 결과로 마커 생성
+      const markers = items.map((it: any) => {
+        const marker = new kakao.maps.Marker({
+          position: new kakao.maps.LatLng(it.lat, it.lng),
+          map: map.current,
+          title: it.title,
+          zIndex: 2,
+        });
+        return marker;
+      });
+      nearbyMarkersRef.current = markers;
+    } catch (e: any) {
+      if (e.name !== "AbortError") console.error("nearby load failed", e);
+    }
   }
 
   async function fetchPlacesForBBox(bbox: BBox) {
     const id = ++reqSeq.current;
-  
+
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-  
+
     setLoading(true);
     setLoadError(null);
     clearDelay();
     const myDelayId = window.setTimeout(() => setShowSpinner(true), 300);
     delayT.current = myDelayId;
-  
+
     try {
       const qs = new URLSearchParams();
-      Object.entries(userCategory).filter(([, v]) => v).forEach(([k]) => qs.append("category", k));
+      Object.entries(userCategory)
+        .filter(([, v]) => v)
+        .forEach(([k]) => qs.append("category", k));
       qs.append("bbox", bboxToString(bbox));
-  
-      const res = await fetch(`/api/places?${qs.toString()}`, { signal: ac.signal });
+
+      const res = await fetch(`/api/places?${qs.toString()}`, {
+        signal: ac.signal,
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const payload = await res.json();
       const places: Place[] = Array.isArray(payload) ? payload : payload.items;
-  
+
       if (id !== reqSeq.current) return;
-  
-      // 기존 마커 정리
-      closeOverlay();
+
+
       markersRef.current.forEach((m: any) => m.setMap(null));
+
       markersRef.current = [];
-  
+
       // 새 마커 + 클릭 핸들러
       const { kakao } = window as any;
+
       markersRef.current = places.map((item) => {
+        const img =
+        pinRef.current?.[item.category as ca] ?? undefined; // 카테고리별 아이콘
         const marker = new kakao.maps.Marker({
           position: new kakao.maps.LatLng(item.lat, item.lng),
           map: map.current,
           title: item.title,
+          image: img, // 👈 중요: 실제로 여기 넣어야 보입니다
         });
-  
-        const handler = () => {
-          if (infoRoot.current) {
-            closeOverlay();
-            infoRoot.current = null;
-          }
-          const container = document.createElement("div");
-          container.className = "marker-overlay";
-          infoRoot.current = createRoot(container);
-          infoRoot.current.render(<MarkerDetail item={item} onClose={onMapClick} />);
-  
-          if (!overlayRef.current) {
-            overlayRef.current = new kakao.maps.CustomOverlay({
-              content: container,
-              position: marker.getPosition(),
-              xAnchor: 0.5,
-              yAnchor: 1,
-              zIndex: 3,
-              clickable: true,
-            });
-          } else {
-            overlayRef.current.setContent(container);
-            overlayRef.current.setPosition(marker.getPosition());
-            overlayRef.current.setZIndex(3);
-          }
-          overlayRef.current?.setMap(map.current);
+
+        const handler = async () => {
+          onMarkerClick(item , marker) ;
+
+         
         };
-  
         kakao.maps.event.addListener(marker, "click", handler);
         return marker;
       });
-  
-      // ✅ 상태 갱신
+
+     
       lastFetchedBboxRef.current = bbox;
       setMarkerCount(places.length);
       setFetchedMarker(true);
     } catch (e: any) {
+      console.log(e);
       if (e.name !== "AbortError") setLoadError("불러오기 실패");
     } finally {
       if (id === reqSeq.current) {
@@ -192,16 +261,15 @@ export default function Page() {
       }
     }
   }
-  
+ 
 
-  const onMapClick = () => {
-    const ov = overlayRef.current;
-    if (!ov) return;
-    ov?.setMap(null);
-    infoRoot.current?.unmount();
-    ov?.setContent("");
-    infoRoot.current = null;
-  };
+  const onCloseSheet = () => {
+    setSheet("closed");
+    setSelected(null);
+    // clearRadiusRing();
+    // clearNearbyMarkers();
+
+  }
 
   const clearDelay = () => {
     if (delayT.current) {
@@ -210,20 +278,6 @@ export default function Page() {
     }
   };
 
-  const allowAutoMove = () => {
-    return (
-      !userInteractedRef.current && Date.now() <= allowAutoMoveUntilRef.current
-    );
-  };
-
-  // 한 번만 fitBounds 실행
-  const fitBoundsOnce = (bounds: any) => {
-    if (didInitialFitRef.current || !allowAutoMove()) return false;
-    programmaticMoveCntRef.current += 1;
-    map.current.setBounds(bounds);
-    didInitialFitRef.current = true; // ✅ 여기서 true로 바꿈 (한 번만 허용)
-    return true;
-  };
 
   const bboxMeaningfullyChanged = (a: BBox | null, b: BBox | null): boolean => {
     if (!a || !b) return true;
@@ -250,7 +304,7 @@ export default function Page() {
         (el.tagName === "INPUT" ||
           el.tagName === "TEXTAREA" ||
           el.isContentEditable);
-      if (e.key === "Escape" && !typing) onMapClick();
+      if (e.key === "Escape" && !typing) onCloseSheet();
       if (e.key.toLowerCase() === "d") {
         setIsDev((prev) => {
           const next = !prev;
@@ -266,21 +320,20 @@ export default function Page() {
 
   useEffect(() => {
     if (!map.current) return;
-      
+
     const cur = boxRef.current ?? readMapBBox(map.current);
     if (!cur) return;
-    fetchPlacesForBBox(cur);   
-    
-
+    fetchPlacesForBBox(cur);
   }, [userCategory]);
 
   useEffect(() => {
     if (!mapRef.current) return;
 
-  
     const init = () => {
       if (!window.kakao?.maps) return;
       if (initializedRef.current) return; // ✅ 중복 방지
+
+
       initializedRef.current = true;
       const handleTilesLoaded = () => {
         setMapReady(true);
@@ -291,18 +344,29 @@ export default function Page() {
         );
       };
 
-
-
       window.kakao.maps.load(async () => {
         if (!mapRef.current) return;
 
         const { kakao } = window;
+
+        const mk = (src: string, w = 28, h = 38) =>
+          new kakao.maps.MarkerImage(src, new kakao.maps.Size(w, h), {
+            offset: new kakao.maps.Point(w / 2, h),
+          });
 
         // 지도 생성
         map.current = new kakao.maps.Map(mapRef.current, {
           center: new kakao.maps.LatLng(37.5665, 126.978),
           level: 5,
         });
+
+        const PIN = {
+          Movie: mk("/pins/movie.svg"),
+          Drama: mk("/pins/drama.svg"),
+          MusicVideo: mk("/pins/music.svg"),
+          selected: mk("/pins/selected.svg", 30, 42),
+        };
+        pinRef.current = PIN;
 
         allowAutoMoveUntilRef.current = Date.now() + 5000;
 
@@ -325,13 +389,10 @@ export default function Page() {
           }
 
           idleId.current = window.setTimeout(() => {
-           
-            // if (!autoSearch) return; // ✅ 자동 모드가 아니면 요청 안 함
-            
+         
             const cur = boxRef.current; // ← 스냅샷
             if (!cur) return;
             if (!bboxMeaningfullyChanged(cur, lastFetchedBboxRef.current))
-              
               return;
 
             fetchPlacesForBBox(cur);
@@ -342,7 +403,7 @@ export default function Page() {
 
         const onDragStart = () => {
           userInteractedRef.current = true; // 사용자가 손댐
-          onMapClick(); //기존 동작 유지
+          onCloseSheet(); //기존 동작 유지
         };
 
         const onZoomChanged = () => {
@@ -351,12 +412,14 @@ export default function Page() {
             userInteractedRef.current = true;
           }
 
-          onMapClick();
+          onCloseSheet();
         };
 
         const onMapCanvasClick = () => {
           userInteractedRef.current = true;
-          onMapClick();
+          onCloseSheet();
+          clearRadiusRing();
+          clearNearbyMarkers();
         };
 
         kakao.maps.event.addListener(map.current, "click", onMapCanvasClick);
@@ -374,87 +437,14 @@ export default function Page() {
         );
 
         onIdle(); //한번 실행
-
-        try {
-        
-          const res = await fetch("/api/places");
-          const places: Place[] = await res.json();
-          
-
-          if (!mapRef.current) return; // 언마운트 방어
-
-          // ✅ 마커마다 개별 리스너 등록
-          markersRef.current = places.map((item) => {
-            const marker = new kakao.maps.Marker({
-              position: new kakao.maps.LatLng(item.lat, item.lng),
-              map: map.current,
-              title: item.title,
-            });
-
-            const handler = () => {
-              //  이전 루트 정리
-              if (infoRoot.current) {
-                closeOverlay();
-                infoRoot.current = null;
-              }
-
-              const container = document.createElement("div");
-              container.className = "marker-overlay"; // CSS용
-
-              // 컨테이너 div 생성
-              // React Root로 MarkerDetail 렌더
-              infoRoot.current = createRoot(container);
-              infoRoot.current.render(
-                <MarkerDetail item={item} onClose={onMapClick} />
-              );
-
-              // 오버레이 생성
-              if (!overlayRef.current) {
-                overlayRef.current = new kakao.maps.CustomOverlay({
-                  content: container,
-                  position: marker.getPosition(),
-                  xAnchor: 0.5,
-                  yAnchor: 1,
-                  zIndex: 3,
-                  clickable: true, // 오버레이 위 UI 클릭이 지도에 먹히지 않도록
-                });
-              } else {
-                overlayRef.current.setContent(container);
-                overlayRef.current.setPosition(marker.getPosition());
-                overlayRef.current.setZIndex(3);
-              }
-
-              overlayRef.current?.setMap(map.current);
-            };
-
-            kakao.maps.event.addListener(marker, "click", handler);
-
-            offHandlers.push(() =>
-              kakao.maps.event.removeListener(marker, "click", handler)
-            );
-
-            return marker;
-          });
-
-          // (선택) 전체 보이게 맞추기
-          if (markersRef.current.length > 1) {
-            const bounds = new kakao.maps.LatLngBounds();
-            markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
-            // (교체)
-            fitBoundsOnce(bounds); // 초기 1회/허용 창 내/미개입일 때만 실행, 그 외엔 조용히 무시
-          }
-        } catch (e) {
-          console.error("Failed to load places", e);
-        }
-         setMarkerCount(markersRef.current.length) ;
-         setFetchedMarker(true) ; 
         // ✅ 정리 루틴 등록
         cleanupRef.current = () => {
-          closeOverlay();
+          // closeOverlay();
           infoRoot.current = null;
           offHandlers.forEach((off) => off());
           markersRef.current.forEach((m) => m.setMap(null));
           initializedRef.current = false;
+          clearNearbyMarkers();
 
           kakao.maps.event.removeListener(
             map.current,
@@ -496,8 +486,6 @@ export default function Page() {
     window.addEventListener("kakao:loaded", onLoaded);
 
     return () => {
-
-     
       window.removeEventListener("kakao:loaded", onLoaded);
 
       cleanupRef.current?.(); // ✅ 누수 방지
@@ -540,8 +528,8 @@ export default function Page() {
       </div>
 
       <div className="relative w-full h-screen">
-        <div ref={mapRef} className="absolute inset-0" /> {/* 처음 지도 로딩 창 스켈레톤 */}
-
+        <div ref={mapRef} className="absolute inset-0" />{" "}
+        {/* 처음 지도 로딩 창 스켈레톤 */}
         {/* 처음 지도 타일 스켈레톤 */}
         {!mapReady && (
           <div
@@ -555,7 +543,6 @@ export default function Page() {
             <div className="absolute bottom-4 left-4 w-36 h-8 rounded bg-white/70 animate-pulse" />
           </div>
         )}
-
         {/* 데이터 로딩 상태(마커 fetch) */}
         {mapReady && showSpinner && (
           <div className="absolute top-4 right-4 z-30 text-xs px-2 py-1 rounded bg-black/80 text-white">
@@ -564,12 +551,15 @@ export default function Page() {
         )}
       </div>
 
-
       {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
           {boundsText}
         </div>
-      )}
+      )} 
+        <SheetProvider onclose={onCloseSheet}>
+        <BottomSheet  selected={selected} snap={sheet} />
+        </SheetProvider>
+     
     </div>
   );
 }
