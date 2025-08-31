@@ -3,14 +3,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BBox, ca, LatLng, Pins, Place } from "../../type/type";
-import MarkerDetail from "./components/markerDetail";
-import { createRoot, Root } from "react-dom/client";
 import SearchBar from "./components/searchBar";
 import CategoryRow from "./components/categoryRow";
 import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
 import BottomSheet from "./components/bottomSheet";
-import { panWithOffset } from "./service/panWithOffset";
+import { getViewportHeight, desiredVisiblePx  , ensureMarkerAboveSheetSoft} from "./service/panWithOffset";
 import { SheetProvider } from "./components/sheetProvider";
+import { decideSheetOrPan } from "./service/decideSheetOrPan";
+
 
 declare global {
   interface Window {
@@ -68,6 +68,7 @@ export default function Page() {
   const radiusCircleRef = useRef<any | null>(null);
   // const radiusLabelRef = useRef<any | null>(null);
   const [radiusM, setRadiusM] = useState(2000);
+  
   const nearbyMarkersRef = useRef<any[]>([]);
   const nearbyAbortRef = useRef<AbortController | null>(null);// 컴포넌트 최상단
   const pinRef = useRef<Pins | null>(null); 
@@ -75,6 +76,7 @@ export default function Page() {
   type SheetState =  "closed" | "peek" | "half" | "full" ;
   const [sheet , setSheet] = useState<SheetState>("closed") ;
   const [selected , setSelected] = useState<Place|null>(null) ; 
+  const [sheetYOverride , setSheetYOverride] = useState<string|null>(null);
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
@@ -134,21 +136,54 @@ export default function Page() {
     nearbyAbortRef.current = null;
   }
   
-  function onMarkerClick(item : Place , marker : any)  {
-    setSelected(item) ;
-    setSheet("half") ; 
- 
-
-    const pos = marker.getPosition();
-    // 이미 쓰는 반경링/근처마커 로직 그대로 호출
-    clearRadiusRing(); drawRadiusRing(pos, radiusM);
-    clearNearbyMarkers(); renderNearbyMarkers({lat:item.lat,lng:item.lng}, radiusM);
+  function onMarkerClick(item: Place, marker: any) {
+    setSelected(item);
+    setSheet("half"); // 의미상 half로 열되, 가리면 보정
   
-    programmaticMoveCntRef.current += 1;
-    panWithOffset(map.current, pos ,Math.round(window.innerHeight * 0.35)) 
+    const pos = marker.getPosition();
+      // 시트가 현재 보이는 높이(px)
+  const vh = getViewportHeight(map.current);
+  const visiblePx = desiredVisiblePx(vh, "half");
+  
+    // 하이브리드 결정
+    const decision = decideSheetOrPan(map.current, pos, "half");
     
+  // 3) 패닝 적용(있으면) — 둘 중 택1
+  if (decision.panBy && decision.panBy > 0) {
+    programmaticMoveCntRef.current += 1;
 
+   
+
+ 
   }
+    
+   
+  
+    if (decision.yOverride) {
+      setSheetYOverride(decision.yOverride); // BottomSheet에 yOverride props로 전달
+      
+    } else {
+      setSheetYOverride(null);
+    }
+  
+
+   
+ 
+   programmaticMoveCntRef.current += 1;     // 자동 이동 플래그
+
+  // 부드럽게 이동(추천)
+  ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
+    gap: 12, factor: 0.6, maxPan: 120, eps: 2
+  });
+
+  
+    // 기존 반경 링/근처마커 로직
+    clearRadiusRing(); 
+    drawRadiusRing(pos, radiusM);
+    clearNearbyMarkers(); 
+    renderNearbyMarkers({ lat: item.lat, lng: item.lng }, radiusM);
+  }
+  
 
   async function renderNearbyMarkers(
     center: { lat: number; lng: number },
@@ -266,6 +301,7 @@ export default function Page() {
   const onCloseSheet = () => {
     setSheet("closed");
     setSelected(null);
+    setSheetYOverride(null);  
     // clearRadiusRing();
     // clearNearbyMarkers();
 
@@ -317,6 +353,8 @@ export default function Page() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+
 
   useEffect(() => {
     if (!map.current) return;
@@ -557,7 +595,7 @@ export default function Page() {
         </div>
       )} 
         <SheetProvider onclose={onCloseSheet}>
-        <BottomSheet  selected={selected} snap={sheet} />
+        <BottomSheet  selected={selected} snap={sheet}  yOverride={sheetYOverride}/>
         </SheetProvider>
      
     </div>
