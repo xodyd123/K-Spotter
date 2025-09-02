@@ -85,6 +85,8 @@ export default function Page() {
     setSelected,
   });
 
+
+
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
 
@@ -143,13 +145,11 @@ export default function Page() {
   }
 
   async function onMarkerClick(item: Place, marker: any) {
-
-    // 1. 즉시 반응 
-    setSelected(item) ;
-    setSheet("half"); 
+    // 1. 즉시 반응
+    setSelected(item);
+    setSheet("half");
     loadAndPatchSelected(item); // 비동기 로딩은 뒤에서 진행
-    //2. 비동기로 이미지 추천 
-
+    //2. 비동기로 이미지 추천
 
     const pos = marker.getPosition();
     // 시트가 현재 보이는 높이(px)
@@ -185,11 +185,9 @@ export default function Page() {
     drawRadiusRing(pos, radiusM);
     clearNearbyMarkers();
     renderNearbyMarkers({ lat: item.lat, lng: item.lng }, radiusM);
-  } 
+  }
 
-  async function onNearbyMarkerClick(item: Place, marker: any){
-
-    
+  async function onNearbyMarkerClick(item: Place, marker: any) {
     setSelected(item);
     setSheet("half"); // 의미상 half로 열되, 가리면 보정
 
@@ -223,8 +221,8 @@ export default function Page() {
     });
 
     // 기존 반경 링/근처마커 로직
-    clearRadiusRing();
-    clearNearbyMarkers();
+   // clearRadiusRing();
+   // clearNearbyMarkers();
   }
 
   async function renderNearbyMarkers(
@@ -246,11 +244,11 @@ export default function Page() {
         cats: ["food", "cafe", "attraction"],
         sort: "reco",
       });
-      
+
       const { items, count } = result;
-       
+
       // 결과로 마커 생성
-   
+
       const markers = items.map((it: any) => {
         const marker = new kakao.maps.Marker({
           position: new kakao.maps.LatLng(it.lat, it.lng),
@@ -261,15 +259,13 @@ export default function Page() {
         const handler = async () => {
           onNearbyMarkerClick(it, marker);
         };
-        kakao.maps.event.addListener(marker, "click", handler); // 언제 지움 ? 
+        kakao.maps.event.addListener(marker, "click", handler); // 언제 지움 ?
         return marker;
       });
       nearbyMarkersRef.current = markers;
     } catch (e: any) {
       if (e.name !== "AbortError") console.error("nearby load failed", e);
     }
-
-    
   }
 
   async function fetchPlacesForBBox(bbox: BBox) {
@@ -297,7 +293,7 @@ export default function Page() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const payload = await res.json();
-      
+
       const places: Place[] = Array.isArray(payload) ? payload : payload.items;
 
       if (id !== reqSeq.current) return;
@@ -397,10 +393,9 @@ export default function Page() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  
 
-
-  useEffect(() => () => cancel(), [cancel]); // 언마운트 시 진행중 요청취소  
-
+  useEffect(() => () => cancel(), [cancel]); // 언마운트 시 진행중 요청취소
 
   useEffect(() => {
     if (!map.current) return;
@@ -443,6 +438,13 @@ export default function Page() {
           level: 5,
         });
 
+        map.current.setZoomable(true);
+        map.current.setDraggable(true);
+
+        // 진단용 컨트롤(버튼으로 확대/축소가 되면 입력(휠) 경로만 문제인 상태)
+        const ctrl = new kakao.maps.ZoomControl();
+        map.current.addControl(ctrl, kakao.maps.ControlPosition.RIGHT);
+
         const PIN = {
           Movie: mk("/pins/movie.svg"),
           Drama: mk("/pins/drama.svg"),
@@ -483,7 +485,7 @@ export default function Page() {
           }, DEBOUNCE_MS);
         };
 
-        const onDragStart = () => { 
+        const onDragStart = () => {
           userInteractedRef.current = true; // 사용자가 손댐
           onCloseSheet(); //기존 동작 유지
         };
@@ -579,11 +581,12 @@ export default function Page() {
       <SearchBar />
       <div
         className="fixed left-1/2 bottom-[max(env(safe-area-inset-top),0.5rem)] -translate-x-1/2 z-20
-             w-[min(92%,720px)] px-2"
+             w-[min(92%,720px)] px-2 pointer-events-none"
       >
         <div
           className="rounded-2xl bg-white/80 backdrop-blur-md shadow-lg border border-white/60
-                  px-3 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar"
+px-3 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar
+pointer-events-auto"
         >
           {/* 3) 여기서 CategoryRow “호출”(렌더링) */}
           <CategoryRow
@@ -615,29 +618,26 @@ export default function Page() {
         {/* 처음 지도 타일 스켈레톤 */}
         {!mapReady && (
           <div
-            className="absolute inset-0 z-30 bg-gray-100/60 backdrop-blur-sm"
+            className="absolute inset-0 z-30 bg-gray-100/60 backdrop-blur-sm pointer-events-none"
             aria-hidden
           >
-            <div
-              className="absolute left-1/2 top-3 -translate-x-1/2 w-[min(92%,720px)] h-12 
-                      rounded-2xl bg-white/70 animate-pulse"
-            />
+            <div className="absolute left-1/2 top-3 -translate-x-1/2 w-[min(92%,720px)] h-12 rounded-2xl bg-white/70 animate-pulse" />
             <div className="absolute bottom-4 left-4 w-36 h-8 rounded bg-white/70 animate-pulse" />
           </div>
         )}
         {/* 데이터 로딩 상태(마커 fetch) */}
         {mapReady && showSpinner && (
-          <div className="absolute top-4 right-4 z-30 text-xs px-2 py-1 rounded bg-black/80 text-white">
+          <div className="absolute top-4 right-4 z-30 text-xs px-2 py-1 rounded bg-black/80 text-white pointer-events-none">
             장소 불러오는 중…
           </div>
         )}
       </div>
 
       {isDev && boundsText && (
-        <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
-          {boundsText}
-        </div>
-      )}
+  <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1 pointer-events-none">
+    {boundsText}
+  </div>
+)}
       <SheetProvider onclose={onCloseSheet}>
         <BottomSheet
           selected={selected}

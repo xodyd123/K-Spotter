@@ -4,7 +4,7 @@ export interface Place {
     lng: number
     title: string
     imageUrl?: string
-    thumb : string | null 
+    thumb : string 
     contentTypeId? : number 
     category: category
 }
