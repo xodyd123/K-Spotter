@@ -1,42 +1,41 @@
 "use client";
-import { useEffect, useState } from "react";
-import { category } from "../../../type/type";
+import { useEffect, useRef, useState } from "react";
+import { category, Place } from "../../../type/type";
 
 export default function MarkerDetail({
   item,
 }: {
-  item: { title: string; lat: number; lng: number; category: category };
+  item: {
+    title: string;
+    lat: number; // 나중에 필요할수도 있으니 넣음 
+    lng: number;
+    category: category;
+    // 대표이미지  
+    thumb: string;
+    contentTypeId? : number 
+
+    // 상세이미지 
+
+  };
 }) {
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
+
+
+  const [place, setPlace] = useState<Place>(item);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<boolean>(false);
 
-  useEffect(() => {
-    const ac = new AbortController();
-    setLoading(true);
-    setError(false);
-    setImgUrl(null);
+  const map = new Map<number, string>();
 
-    (async () => {
-      try {
-        const r = await fetch(
-          `/api/images?keyword=${encodeURIComponent(item.title)}`,
-          { signal: ac.signal }
-        );
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const j = await r.json();
-        const raw = j?.response?.body?.items?.item;
-        const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
-        setImgUrl(items[3]?.galWebImageUrl ?? null);
-      } catch (e: any) {
-        if (e.name !== "AbortError") setError(true);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  map.set(2, "관광지");
+  map.set(14, "문화시설");
+  map.set(15, "축제공연행사");
+  map.set(25, "여행코스");
+  map.set(28, "레포츠");
+  map.set(32, "숙박");
+  map.set(38, "쇼핑");
+  map.set(39, "음식점");
 
-    return () => ac.abort();
-  }, [item.title]);
+
 
   return (
     <section
@@ -47,10 +46,10 @@ export default function MarkerDetail({
       {/* 이미지 영역 */}
       <div className="relative aspect-[16/9] w-full bg-gray-100">
         {/* 실제 이미지 */}
-        {imgUrl && !error ? (
+        {place.thumb && !error ? (
           <img
-            src={imgUrl}
-            alt={item.title}
+            src={place.thumb}
+            alt={place.title}
             className="absolute inset-0 h-full w-full object-cover"
             draggable={false}
           />
@@ -75,7 +74,7 @@ export default function MarkerDetail({
         {/* 제목 + 카테고리 */}
         <div className="flex items-start justify-between gap-3">
           <h2 className="flex-1 truncate text-2xl font-extrabold leading-tight tracking-tight text-gray-900">
-            {item.title}
+            {place.title}
           </h2>
           <span
             className="
@@ -84,7 +83,7 @@ export default function MarkerDetail({
             "
             aria-label="카테고리"
           >
-            {item.category}
+            {place.category}
           </span>
         </div>
 
@@ -92,8 +91,8 @@ export default function MarkerDetail({
         <div className="mt-3 flex items-center gap-2">
           <a
             href={`https://map.kakao.com/link/to/${encodeURIComponent(
-              item.title
-            )},${item.lat},${item.lng}`}
+              place.title
+            )},${place.lat},${place.lng}`}
             target="_blank"
             rel="noreferrer"
             className="

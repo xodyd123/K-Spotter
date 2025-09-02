@@ -11,6 +11,8 @@ export async function GET(req: NextRequest) {
     const numOfRows = req.nextUrl.searchParams.get("numOfRows") ?? "10";
     const arrange = req.nextUrl.searchParams.get("arrange") ?? ""; // A/B/C
 
+  
+
     if (!SERVICE_KEY) {
       return NextResponse.json({ error: "Missing service key" }, { status: 500 });
     }
@@ -28,11 +30,14 @@ export async function GET(req: NextRequest) {
     // serviceKey는 재인코딩 방지: 직접 붙인다
     const url = `${BASE}?serviceKey=${SERVICE_KEY}&${params.toString()}`;
 
+
     const upstream = await fetch(url, { cache: "no-store" });
-    
+    const j = await upstream.json();
+    const raw = j?.response?.body?.items?.item;
+    const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
   
 
-    const data = await upstream.json(); // _type=json 필수
-    return NextResponse.json(data);
+  
+    return NextResponse.json(items);
   
 }

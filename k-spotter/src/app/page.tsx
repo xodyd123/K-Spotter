@@ -7,23 +7,22 @@ import SearchBar from "./components/searchBar";
 import CategoryRow from "./components/categoryRow";
 import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
 import BottomSheet from "./components/bottomSheet";
-import { getViewportHeight, desiredVisiblePx  , ensureMarkerAboveSheetSoft} from "./service/panWithOffset";
+import {
+  getViewportHeight,
+  desiredVisiblePx,
+  ensureMarkerAboveSheetSoft,
+} from "./service/panWithOffset";
 import { SheetProvider } from "./components/sheetProvider";
 import { decideSheetOrPan } from "./service/decideSheetOrPan";
-
+import { getSpotter } from "@/lib/mock/apitour/getSpotter";
+import { GetKeywordSearch } from "./service/getKeyword";
+import { SearchImage } from "@/lib/mock/galley/searchImage";
 
 declare global {
   interface Window {
     kakao?: any;
   }
 }
-
-type CustomOverlayLike = {
-  setMap(map: any | null): void;
-  setPosition(pos: any): void;
-  setContent(content: HTMLElement | string): void;
-  setZIndex(z: number): void;
-};
 
 export default function Page() {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -68,15 +67,15 @@ export default function Page() {
   const radiusCircleRef = useRef<any | null>(null);
   // const radiusLabelRef = useRef<any | null>(null);
   const [radiusM, setRadiusM] = useState(2000);
-  
-  const nearbyMarkersRef = useRef<any[]>([]);
-  const nearbyAbortRef = useRef<AbortController | null>(null);// 컴포넌트 최상단
-  const pinRef = useRef<Pins | null>(null); 
 
-  type SheetState =  "closed" | "peek" | "half" | "full" ;
-  const [sheet , setSheet] = useState<SheetState>("closed") ;
-  const [selected , setSelected] = useState<Place|null>(null) ; 
-  const [sheetYOverride , setSheetYOverride] = useState<string|null>(null);
+  const nearbyMarkersRef = useRef<any[]>([]);
+  const nearbyAbortRef = useRef<AbortController | null>(null); // 컴포넌트 최상단
+  const pinRef = useRef<Pins | null>(null);
+
+  type SheetState = "closed" | "peek" | "half" | "full";
+  const [sheet, setSheet] = useState<SheetState>("closed");
+  const [selected, setSelected] = useState<Place | null>(null);
+  const [sheetYOverride, setSheetYOverride] = useState<string | null>(null);
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
@@ -126,7 +125,6 @@ export default function Page() {
     });
     circle.setMap(map.current);
     radiusCircleRef.current = circle;
-
   }
 
   function clearNearbyMarkers() {
@@ -135,55 +133,104 @@ export default function Page() {
     nearbyAbortRef.current?.abort();
     nearbyAbortRef.current = null;
   }
-  
-  function onMarkerClick(item: Place, marker: any) {
-    setSelected(item);
+
+  async function onMarkerClick(item: Place, marker: any) {
+
+    const {lat, lng , title} = item
+    const [s, k, i] = await Promise.allSettled([
+      getSpotter({ lat, lng, radius: 200, contentTypeId: 12 }),
+      GetKeywordSearch({ keyword: title }),
+      SearchImage({ title }),  // 이미지 
+    ]);
+    
+    const third    = s.status === "fulfilled" ? s.value : null;
+    const second  = k.status === "fulfilled" ? k.value : null;
+    const first   = i.status === "fulfilled" ? i.value : null;
+
+    const check  = first || second || third ;
+
+    const thumb = check && check[0].galWebImageUrl;
+    
+
+    
+    setSelected({... item , thumb });
     setSheet("half"); // 의미상 half로 열되, 가리면 보정
-  
+
     const pos = marker.getPosition();
-      // 시트가 현재 보이는 높이(px)
-  const vh = getViewportHeight(map.current);
-  const visiblePx = desiredVisiblePx(vh, "half");
-  
+    // 시트가 현재 보이는 높이(px)
+    const vh = getViewportHeight(map.current);
+    const visiblePx = desiredVisiblePx(vh, "half");
+
     // 하이브리드 결정
     const decision = decideSheetOrPan(map.current, pos, "half");
-    
-  // 3) 패닝 적용(있으면) — 둘 중 택1
-  if (decision.panBy && decision.panBy > 0) {
-    programmaticMoveCntRef.current += 1;
 
-   
+    // 3) 패닝 적용(있으면) — 둘 중 택1
+    if (decision.panBy && decision.panBy > 0) {
+      programmaticMoveCntRef.current += 1;
+    }
 
- 
-  }
-    
-   
-  
     if (decision.yOverride) {
       setSheetYOverride(decision.yOverride); // BottomSheet에 yOverride props로 전달
-      
     } else {
       setSheetYOverride(null);
     }
-  
 
-   
- 
-   programmaticMoveCntRef.current += 1;     // 자동 이동 플래그
+    programmaticMoveCntRef.current += 1; // 자동 이동 플래그
 
-  // 부드럽게 이동(추천)
-  ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
-    gap: 12, factor: 0.6, maxPan: 120, eps: 2
-  });
+    // 부드럽게 이동(추천)
+    ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
+      gap: 12,
+      factor: 0.6,
+      maxPan: 120,
+      eps: 2,
+    });
 
-  
     // 기존 반경 링/근처마커 로직
-    clearRadiusRing(); 
+    clearRadiusRing();
     drawRadiusRing(pos, radiusM);
-    clearNearbyMarkers(); 
+    clearNearbyMarkers();
     renderNearbyMarkers({ lat: item.lat, lng: item.lng }, radiusM);
+  } 
+
+  async function onNearbyMarkerClick(item: Place, marker: any){
+
+    
+    setSelected(item);
+    setSheet("half"); // 의미상 half로 열되, 가리면 보정
+
+    const pos = marker.getPosition();
+    // 시트가 현재 보이는 높이(px)
+    const vh = getViewportHeight(map.current);
+    const visiblePx = desiredVisiblePx(vh, "half");
+
+    // 하이브리드 결정
+    const decision = decideSheetOrPan(map.current, pos, "half");
+
+    // 3) 패닝 적용(있으면) — 둘 중 택1
+    if (decision.panBy && decision.panBy > 0) {
+      programmaticMoveCntRef.current += 1;
+    }
+
+    if (decision.yOverride) {
+      setSheetYOverride(decision.yOverride); // BottomSheet에 yOverride props로 전달
+    } else {
+      setSheetYOverride(null);
+    }
+
+    programmaticMoveCntRef.current += 1; // 자동 이동 플래그
+
+    // 부드럽게 이동(추천)
+    ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
+      gap: 12,
+      factor: 0.6,
+      maxPan: 120,
+      eps: 2,
+    });
+
+    // 기존 반경 링/근처마커 로직
+    clearRadiusRing();
+    clearNearbyMarkers();
   }
-  
 
   async function renderNearbyMarkers(
     center: { lat: number; lng: number },
@@ -204,9 +251,11 @@ export default function Page() {
         cats: ["food", "cafe", "attraction"],
         sort: "reco",
       });
-
+      
       const { items, count } = result;
+       
       // 결과로 마커 생성
+   
       const markers = items.map((it: any) => {
         const marker = new kakao.maps.Marker({
           position: new kakao.maps.LatLng(it.lat, it.lng),
@@ -214,12 +263,18 @@ export default function Page() {
           title: it.title,
           zIndex: 2,
         });
+        const handler = async () => {
+          onNearbyMarkerClick(it, marker);
+        };
+        kakao.maps.event.addListener(marker, "click", handler); // 언제 지움 ? 
         return marker;
       });
       nearbyMarkersRef.current = markers;
     } catch (e: any) {
       if (e.name !== "AbortError") console.error("nearby load failed", e);
     }
+
+    
   }
 
   async function fetchPlacesForBBox(bbox: BBox) {
@@ -247,10 +302,10 @@ export default function Page() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const payload = await res.json();
+      
       const places: Place[] = Array.isArray(payload) ? payload : payload.items;
 
       if (id !== reqSeq.current) return;
-
 
       markersRef.current.forEach((m: any) => m.setMap(null));
 
@@ -260,25 +315,21 @@ export default function Page() {
       const { kakao } = window as any;
 
       markersRef.current = places.map((item) => {
-        const img =
-        pinRef.current?.[item.category as ca] ?? undefined; // 카테고리별 아이콘
+        const img = pinRef.current?.[item.category as ca] ?? undefined; // 카테고리별 아이콘
         const marker = new kakao.maps.Marker({
           position: new kakao.maps.LatLng(item.lat, item.lng),
           map: map.current,
           title: item.title,
           image: img, // 👈 중요: 실제로 여기 넣어야 보입니다
         });
-
         const handler = async () => {
-          onMarkerClick(item , marker) ;
-
-         
+          onMarkerClick(item, marker);
         };
         kakao.maps.event.addListener(marker, "click", handler);
+
         return marker;
       });
 
-     
       lastFetchedBboxRef.current = bbox;
       setMarkerCount(places.length);
       setFetchedMarker(true);
@@ -296,16 +347,14 @@ export default function Page() {
       }
     }
   }
- 
 
   const onCloseSheet = () => {
     setSheet("closed");
     setSelected(null);
-    setSheetYOverride(null);  
+    setSheetYOverride(null);
     // clearRadiusRing();
     // clearNearbyMarkers();
-
-  }
+  };
 
   const clearDelay = () => {
     if (delayT.current) {
@@ -313,7 +362,6 @@ export default function Page() {
       delayT.current = null;
     }
   };
-
 
   const bboxMeaningfullyChanged = (a: BBox | null, b: BBox | null): boolean => {
     if (!a || !b) return true;
@@ -354,8 +402,6 @@ export default function Page() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-
-
   useEffect(() => {
     if (!map.current) return;
 
@@ -370,7 +416,6 @@ export default function Page() {
     const init = () => {
       if (!window.kakao?.maps) return;
       if (initializedRef.current) return; // ✅ 중복 방지
-
 
       initializedRef.current = true;
       const handleTilesLoaded = () => {
@@ -427,7 +472,6 @@ export default function Page() {
           }
 
           idleId.current = window.setTimeout(() => {
-         
             const cur = boxRef.current; // ← 스냅샷
             if (!cur) return;
             if (!bboxMeaningfullyChanged(cur, lastFetchedBboxRef.current))
@@ -593,11 +637,14 @@ export default function Page() {
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1">
           {boundsText}
         </div>
-      )} 
-        <SheetProvider onclose={onCloseSheet}>
-        <BottomSheet  selected={selected} snap={sheet}  yOverride={sheetYOverride}/>
-        </SheetProvider>
-     
+      )}
+      <SheetProvider onclose={onCloseSheet}>
+        <BottomSheet
+          selected={selected}
+          snap={sheet}
+          yOverride={sheetYOverride}
+        />
+      </SheetProvider>
     </div>
   );
 }

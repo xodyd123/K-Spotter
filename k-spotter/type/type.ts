@@ -1,12 +1,15 @@
 export interface Place {
-    id: string
+    id?: string
     lat: number
     lng: number
     title: string
-    imageUrl: string
+    imageUrl?: string
+    thumb : string
+    contentTypeId? : number 
     category: category
-  
 }
+
+
 
 export enum category{
 
@@ -14,7 +17,11 @@ export enum category{
 
     MOVIE = "Movie" , 
     
-    MUSIC = "MusicVideo"
+    MUSIC = "MusicVideo"  , 
+ 
+   OTHER = "Other"
+
+
 
 }
 
