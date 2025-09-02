@@ -1,10 +1,10 @@
 export interface Place {
-    id?: string
+    id: string
     lat: number
     lng: number
     title: string
     imageUrl?: string
-    thumb : string
+    thumb : string | null 
     contentTypeId? : number 
     category: category
 }

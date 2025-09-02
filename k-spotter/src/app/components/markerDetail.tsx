@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect,  useState , useMemo } from "react";
 import { category, Place } from "../../../type/type";
 
 export default function MarkerDetail({
   item,
 }: {
   item: {
+    id: string
     title: string;
     lat: number; // 나중에 필요할수도 있으니 넣음 
     lng: number;
@@ -19,21 +20,36 @@ export default function MarkerDetail({
   };
 }) {
 
+  // ✅ “정체성 키”: 선택이 바뀔 때만 초기화되도록
+  const itemKey = useMemo(
+    () => item.id ?? `${item.title}|${item.lat}|${item.lng}`,
+    [item.id, item.title, item.lat, item.lng]
+  );
 
-  const [place, setPlace] = useState<Place>(item);
+  
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<boolean>(false);
+  const [error, setError] = useState<boolean>(false); 
+  
+    // ✅ 이미지 관련 상태만 로컬로
+  const [thumb, setThumb] = useState<string | null>(item.thumb ?? null);  
 
-  const map = new Map<number, string>();
+  useEffect(()=> {
+    setThumb(item.thumb ?? null);
+    setError(false);
+    setLoading(!!item.thumb);
 
-  map.set(2, "관광지");
-  map.set(14, "문화시설");
-  map.set(15, "축제공연행사");
-  map.set(25, "여행코스");
-  map.set(28, "레포츠");
-  map.set(32, "숙박");
-  map.set(38, "쇼핑");
-  map.set(39, "음식점");
+  } ,[itemKey , item.thumb]) ; 
+
+  // const map = new Map<number, string>();
+
+  // map.set(2, "관광지");
+  // map.set(14, "문화시설");
+  // map.set(15, "축제공연행사");
+  // map.set(25, "여행코스");
+  // map.set(28, "레포츠");
+  // map.set(32, "숙박");
+  // map.set(38, "쇼핑");
+  // map.set(39, "음식점"); // 쓸때 재랜더링 되니 컴포넌트 밖으로 빼기 
 
 
 
@@ -46,10 +62,10 @@ export default function MarkerDetail({
       {/* 이미지 영역 */}
       <div className="relative aspect-[16/9] w-full bg-gray-100">
         {/* 실제 이미지 */}
-        {place.thumb && !error ? (
+        {thumb && !error ? (
           <img
-            src={place.thumb}
-            alt={place.title}
+            src={thumb}
+            alt={item.title}
             className="absolute inset-0 h-full w-full object-cover"
             draggable={false}
           />
@@ -74,7 +90,7 @@ export default function MarkerDetail({
         {/* 제목 + 카테고리 */}
         <div className="flex items-start justify-between gap-3">
           <h2 className="flex-1 truncate text-2xl font-extrabold leading-tight tracking-tight text-gray-900">
-            {place.title}
+            {item.title}
           </h2>
           <span
             className="
@@ -83,7 +99,7 @@ export default function MarkerDetail({
             "
             aria-label="카테고리"
           >
-            {place.category}
+            {item.category}
           </span>
         </div>
 
@@ -91,8 +107,8 @@ export default function MarkerDetail({
         <div className="mt-3 flex items-center gap-2">
           <a
             href={`https://map.kakao.com/link/to/${encodeURIComponent(
-              place.title
-            )},${place.lat},${place.lng}`}
+              item.title
+            )},${item.lat},${item.lng}`}
             target="_blank"
             rel="noreferrer"
             className="

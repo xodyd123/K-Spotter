@@ -17,6 +17,7 @@ import { decideSheetOrPan } from "./service/decideSheetOrPan";
 import { getSpotter } from "@/lib/mock/apitour/getSpotter";
 import { GetKeywordSearch } from "./service/getKeyword";
 import { SearchImage } from "@/lib/mock/galley/searchImage";
+import { useSelectedLoader } from "./service/fetchImage";
 
 declare global {
   interface Window {
@@ -77,6 +78,13 @@ export default function Page() {
   const [selected, setSelected] = useState<Place | null>(null);
   const [sheetYOverride, setSheetYOverride] = useState<string | null>(null);
 
+  const { loadAndPatchSelected, cancel } = useSelectedLoader({
+    getSpotter,
+    GetKeywordSearch,
+    SearchImage,
+    setSelected,
+  });
+
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
 
@@ -136,25 +144,12 @@ export default function Page() {
 
   async function onMarkerClick(item: Place, marker: any) {
 
-    const {lat, lng , title} = item
-    const [s, k, i] = await Promise.allSettled([
-      getSpotter({ lat, lng, radius: 200, contentTypeId: 12 }),
-      GetKeywordSearch({ keyword: title }),
-      SearchImage({ title }),  // 이미지 
-    ]);
-    
-    const third    = s.status === "fulfilled" ? s.value : null;
-    const second  = k.status === "fulfilled" ? k.value : null;
-    const first   = i.status === "fulfilled" ? i.value : null;
+    // 1. 즉시 반응 
+    setSelected(item) ;
+    setSheet("half"); 
+    loadAndPatchSelected(item); // 비동기 로딩은 뒤에서 진행
+    //2. 비동기로 이미지 추천 
 
-    const check  = first || second || third ;
-
-    const thumb = check && check[0].galWebImageUrl;
-    
-
-    
-    setSelected({... item , thumb });
-    setSheet("half"); // 의미상 half로 열되, 가리면 보정
 
     const pos = marker.getPosition();
     // 시트가 현재 보이는 높이(px)
@@ -402,6 +397,11 @@ export default function Page() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+
+
+  useEffect(() => () => cancel(), [cancel]); // 언마운트 시 진행중 요청취소  
+
+
   useEffect(() => {
     if (!map.current) return;
 
@@ -483,7 +483,7 @@ export default function Page() {
           }, DEBOUNCE_MS);
         };
 
-        const onDragStart = () => {
+        const onDragStart = () => { 
           userInteractedRef.current = true; // 사용자가 손댐
           onCloseSheet(); //기존 동작 유지
         };
