@@ -1,6 +1,6 @@
 "use client";
 import { useEffect,  useState , useMemo } from "react";
-import { category, Place } from "../../../type/type";
+import { category } from "../../../type/type";
 
 export default function MarkerDetail({
   item,

@@ -17,7 +17,7 @@ import { decideSheetOrPan } from "./service/decideSheetOrPan";
 import { getSpotter } from "@/lib/mock/apitour/getSpotter";
 import { GetKeywordSearch } from "./service/getKeyword";
 import { SearchImage } from "@/lib/mock/galley/searchImage";
-import { useSelectedLoader } from "./service/fetchImage";
+import { useSelectedLoader } from "../hooks/fetchImage"
 
 declare global {
   interface Window {
