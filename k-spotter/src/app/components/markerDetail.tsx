@@ -28,7 +28,7 @@ export default function MarkerDetail({
 
   
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<boolean>(false); 
+  const [error, setError] = useState<boolean>(false) ;
   
     // ✅ 이미지 관련 상태만 로컬로
   const [thumb, setThumb] = useState<string | null>(item.thumb ?? null);  
