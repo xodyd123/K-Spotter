@@ -1,8 +1,11 @@
 // app/api/places/route.ts  (예시: App Router)
 import { NextRequest, NextResponse } from "next/server";
-import { mockPlaces } from "../../../lib/mock/mockData"; 
+import { pool } from "../../../../lib/db"
+
 
 type BBoxArr = [number, number, number, number]; // [swLat, swLng, neLat, neLng]
+
+export const runtime = "nodejs";
 
 const parseBbox = (bboxStr: string | null): BBoxArr | null => {
   if (!bboxStr) return null;
@@ -32,29 +35,57 @@ const pointInBbox = (bbox: BBoxArr, lat: number, lng: number): boolean => {
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
 
-  // 카테고리는 여러 번 올 수 있음: ?category=Drama&category=Movie
-  const cats = sp.getAll("category"); // string[]
+  // 프런트에서 보내는 카테고리(Drama/Movie/MusicVideo) → DB의 media_type
+  const cats = sp.getAll("category"); // 예: ?category=Drama&category=Movie
+  const bbox = parseBbox(sp.get("bbox")); // "minLng,minLat,maxLng,maxLat"
+  const limit = 200
 
-  // bbox 파싱(없거나 잘못되면 null)
-  const bbox = parseBbox(sp.get("bbox"));
 
-  // 1) 기본 후보
-  let list = mockPlaces;
 
-  // 2) 카테고리 필터 (선택됨이 있을 때만)
-  if (cats.length > 0) {
-    const catSet = new Set(cats);
-    list = list.filter(p => 
-         catSet.has(p.category));
-   // 문자열이 같아야 함
-    // 필요시 대소문자 통일: catSet.has(p.category.toLowerCase())
-  }
+  // 동적 WHERE 구성
+  let where = "WHERE geom IS NOT NULL";
+  const params: any[] = [];
+  let i = 1;
 
-  // 3) BBox 필터 (bbox가 유효할 때만)
   if (bbox) {
-    
-    list = list.filter(p => pointInBbox(bbox, p.lat, p.lng));
+    const [minLng, minLat, maxLng, maxLat] = bbox;
+    where += ` AND geom && ST_MakeEnvelope($${i},$${i + 1},$${i + 2},$${i + 3},4326)`;
+    params.push(minLng, minLat, maxLng, maxLat);
+    i += 4;
   }
 
-  return NextResponse.json(list);
+  if (cats.length > 0) {
+    where += ` AND media_type = ANY($${i}::text[])`;
+    params.push(cats);
+    i += 1;
+  }
+
+  // if (!includeParking) {
+  //   // 주차장/parking 류는 기본 숨김
+  //   where += ` AND COALESCE(place_type,'') !~* '(주차|주차장|parking|car ?park)'`;
+  // }
+
+  const order = `ORDER BY updated_at DESC NULLS LAST, spot_id DESC`;
+  const sql = `
+    SELECT
+      spot_id AS id,
+      lat, lng,
+      title, place_name, address,
+      media_type AS category,      -- 프런트 타입에 맞춰 별칭
+      place_type
+    FROM public.spots
+    ${where}
+    ${order}
+    LIMIT $${i};
+  `;
+  params.push(limit);
+
+  try {
+    const { rows } = await pool.query(sql, params);
+ 
+    return NextResponse.json(rows);
+  } catch (e: any) {
+    console.error(e);
+    return NextResponse.json({ error: "server error" }, { status: 500 });
+  }
 }

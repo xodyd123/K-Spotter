@@ -26,6 +26,7 @@ declare global {
 }
 
 export default function Page() {
+  const MAX_POINTS = 500;
   const mapRef = useRef<HTMLDivElement>(null);
 
   //  중복 초기화/정리 핸들 보관
@@ -41,7 +42,7 @@ export default function Page() {
     const fromStore = localStorage.getItem("devhud") === "1";
     return query || fromStore;
   });
-
+  
   const [userCategory, setCategory] = useState<Record<ca, boolean>>({
     Drama: false,
     Movie: false,
@@ -109,7 +110,9 @@ export default function Page() {
 
   function bboxToString(bb: BBox): string {
     const f = (n: number) => n.toFixed(6);
-    return `${f(bb.sw[0])},${f(bb.sw[1])},${f(bb.ne[0])},${f(bb.ne[1])}`;
+    const minLng = bb.sw[1], minLat = bb.sw[0];
+    const maxLng = bb.ne[1], maxLat = bb.ne[0];
+    return `${f(minLng)},${f(minLat)},${f(maxLng)},${f(maxLat)}`;
   }
 
   function clearRadiusRing() {
@@ -244,10 +247,10 @@ export default function Page() {
         cats: ["food", "cafe", "attraction"],
         sort: "reco",
       });
+      const { items } = result;
 
-      const { items, count } = result;
 
-      // 결과로 마커 생성
+
 
       const markers = items.map((it: any) => {
         const marker = new kakao.maps.Marker({
@@ -283,24 +286,28 @@ export default function Page() {
 
     try {
       const qs = new URLSearchParams();
+
+      // 카테고리 선택값
       Object.entries(userCategory)
         .filter(([, v]) => v)
         .forEach(([k]) => qs.append("category", k));
+  
+      // ⚠️ bboxToString은 반드시 minLng,minLat,maxLng,maxLat(경도→위도 순서)
       qs.append("bbox", bboxToString(bbox));
-
-      const res = await fetch(`/api/places?${qs.toString()}`, {
-        signal: ac.signal,
-      });
+      qs.append("mode", "points");              // points 모드 강제
+      // qs.append("limit", String(MAX_POINTS));   // 500개 제한
+  
+      const res = await fetch(`/api/places?${qs.toString()}`, { signal: ac.signal });
+    
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const payload = await res.json();
-
-      const places: Place[] = Array.isArray(payload) ? payload : payload.items;
-
+      const places: Place[] = await res.json();
+     
       if (id !== reqSeq.current) return;
-
+  
+      // 기존 마커 제거 후 다시 그림(지금 방식 그대로)
       markersRef.current.forEach((m: any) => m.setMap(null));
-
       markersRef.current = [];
+  
 
       // 새 마커 + 클릭 핸들러
       const { kakao } = window as any;

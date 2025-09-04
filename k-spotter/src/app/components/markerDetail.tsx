@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { category } from '../../../type/type';
 import { useFavorites } from '@/hooks/useLocalStorage';
 
 export default function MarkerDetail({ item }: {
@@ -10,7 +9,9 @@ export default function MarkerDetail({ item }: {
     title: string;
     lat: number;
     lng: number;
-    category: category;
+    category: string 
+    address : string 
+    place_name : string 
     thumb?: string | null;
     contentTypeId?: number;
   };
@@ -30,20 +31,17 @@ export default function MarkerDetail({ item }: {
       title: item.title,
       lat: item.lat,
       lng: item.lng,
-      thumb: item.thumb ?? null,
+      thumb: item.thumb ?? null, 
+     
     });
   }, [item.id , item.title , item.lat , item.lng , item.thumb] );
 
   // 아이템 바뀔 때만 이미지 상태 초기화
   useEffect(() => {
   
-
-
     setThumb(item.thumb ?? null);
     setError(false);
     setLoading(!!item.thumb);
-
-
   }, [item.id, item.thumb]);
 
   return (
