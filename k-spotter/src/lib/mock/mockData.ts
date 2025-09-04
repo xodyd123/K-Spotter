@@ -6,7 +6,7 @@ export const mockPlaces: Place[] = [
     lat: 37.5512,
     lng: 126.9882,
     title: "남산서울타워",
-    imageUrl: "/images/namsan.jpg",
+    imageUrl: "/images/gyeongbokgung.jpg",
     category: category.DRAMA,
   },
   {
@@ -14,7 +14,7 @@ export const mockPlaces: Place[] = [
     lat: 37.5826,
     lng: 126.983,
     title: "북촌한옥마을",
-    imageUrl: "/images/bukchon.jpg",
+    imageUrl: "/images/gyeongbokgung.jpg",
     category: category.DRAMA,
   },
   {

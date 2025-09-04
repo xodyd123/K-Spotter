@@ -4,9 +4,12 @@ export interface Place {
     lng: number
     title: string
     imageUrl?: string
-    thumb : string 
+    thumb : string | null
     contentTypeId? : number 
-    category: category
+    category: string 
+    address : string 
+    place_name : string 
+
 }
 
 
