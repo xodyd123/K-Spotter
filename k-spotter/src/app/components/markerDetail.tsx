@@ -1,4 +1,6 @@
+
 'use client';
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFavorites } from '@/hooks/useLocalStorage';
@@ -38,7 +40,6 @@ export default function MarkerDetail({ item }: {
 
   // 아이템 바뀔 때만 이미지 상태 초기화
   useEffect(() => {
-  
     setThumb(item.thumb ?? null);
     setError(false);
     setLoading(!!item.thumb);
