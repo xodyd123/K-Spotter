@@ -1,42 +1,57 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect,  useState , useMemo } from "react";
 import { category } from "../../../type/type";
 
 export default function MarkerDetail({
   item,
 }: {
-  item: { title: string; lat: number; lng: number; category: category };
+  item: {
+    id: string
+    title: string;
+    lat: number; // 나중에 필요할수도 있으니 넣음 
+    lng: number;
+    category: category;
+    // 대표이미지  
+    thumb: string;
+    contentTypeId? : number 
+
+    // 상세이미지 
+
+  };
 }) {
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
+
+  // ✅ “정체성 키”: 선택이 바뀔 때만 초기화되도록
+  const itemKey = useMemo(
+    () => item.id ?? `${item.title}|${item.lat}|${item.lng}`,
+    [item.id, item.title, item.lat, item.lng]
+  );
+
+  
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<boolean>(false);
+  const [error, setError] = useState<boolean>(false) ;
+  
+    // ✅ 이미지 관련 상태만 로컬로
+  const [thumb, setThumb] = useState<string | null>(item.thumb ?? null);  
 
-  useEffect(() => {
-    const ac = new AbortController();
-    setLoading(true);
+  useEffect(()=> {
+    setThumb(item.thumb ?? null);
     setError(false);
-    setImgUrl(null);
+    setLoading(!!item.thumb);
 
-    (async () => {
-      try {
-        const r = await fetch(
-          `/api/images?keyword=${encodeURIComponent(item.title)}`,
-          { signal: ac.signal }
-        );
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const j = await r.json();
-        const raw = j?.response?.body?.items?.item;
-        const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
-        setImgUrl(items[3]?.galWebImageUrl ?? null);
-      } catch (e: any) {
-        if (e.name !== "AbortError") setError(true);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  } ,[itemKey , item.thumb]) ; 
 
-    return () => ac.abort();
-  }, [item.title]);
+  // const map = new Map<number, string>();
+
+  // map.set(2, "관광지");
+  // map.set(14, "문화시설");
+  // map.set(15, "축제공연행사");
+  // map.set(25, "여행코스");
+  // map.set(28, "레포츠");
+  // map.set(32, "숙박");
+  // map.set(38, "쇼핑");
+  // map.set(39, "음식점"); // 쓸때 재랜더링 되니 컴포넌트 밖으로 빼기 
+
+
 
   return (
     <section
@@ -47,9 +62,9 @@ export default function MarkerDetail({
       {/* 이미지 영역 */}
       <div className="relative aspect-[16/9] w-full bg-gray-100">
         {/* 실제 이미지 */}
-        {imgUrl && !error ? (
+        {thumb && !error ? (
           <img
-            src={imgUrl}
+            src={thumb}
             alt={item.title}
             className="absolute inset-0 h-full w-full object-cover"
             draggable={false}

@@ -2,6 +2,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: process.cwd(), // ✅ path/__dirname 불필요
+ 
   images: {
     // 외부 이미지 허용 목록
     remotePatterns: [
