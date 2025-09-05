@@ -648,7 +648,10 @@ pointer-events-auto"
       <SheetProvider onclose={onCloseSheet}>
         <BottomSheet
           selected={selected}
-          snap={sheet}
+          sheet={sheet}
+      
+          setSheet= {setSheet}
+          
           yOverride={sheetYOverride}
         />
       </SheetProvider>
