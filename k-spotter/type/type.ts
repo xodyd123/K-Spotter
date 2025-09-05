@@ -12,6 +12,17 @@ export interface Place {
 
 }
 
+export type TourItem = {
+    contentid?: string | number;      // ✅ 고유 ID (dedupe/Place.id에 사용)
+    contenttypeid?: string | number;  // ✅ 유형 (Place.contentTypeId에 매핑)
+    mapx?: string | number;           // 경도
+    mapy?: string | number;           // 위도
+    title?: string;
+    addr1?: string;
+    firstimage?: string;
+  };
+  
+
 
 
 export enum category{
@@ -23,7 +34,6 @@ export enum category{
     MUSIC = "MusicVideo"  , 
  
    OTHER = "Other"
-
 
 
 }
