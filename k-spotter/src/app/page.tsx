@@ -15,7 +15,7 @@ import {
 import { SheetProvider } from "./components/sheetProvider";
 import { decideSheetOrPan } from "./service/decideSheetOrPan";
 import { getSpotter } from "@/lib/mock/apitour/getSpotter";
-import { GetKeywordSearch } from "./service/getKeyword";
+import { GetKeywordSearch } from "../lib/mock/apitour/getKeyword";
 import { SearchImage } from "@/lib/mock/galley/searchImage";
 
 import { useSelectedLoader } from "../hooks/fetchImage"
@@ -250,8 +250,6 @@ export default function Page() {
         sort: "reco",
       });
       const { items } = result;
-
-
 
 
       const markers = items.map((it: any) => {
@@ -650,7 +648,10 @@ pointer-events-auto"
       <SheetProvider onclose={onCloseSheet}>
         <BottomSheet
           selected={selected}
-          snap={sheet}
+          sheet={sheet}
+      
+          setSheet= {setSheet}
+          
           yOverride={sheetYOverride}
         />
       </SheetProvider>
