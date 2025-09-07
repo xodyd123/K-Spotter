@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+
 import { useFavorites } from "@/hooks/useLocalStorage";
 import { DetailPlace, Home, NearbyPlace, Place } from "../../../type/type";
 import HomeComponent from "./homeContnet";
 import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
+import { useQueryClient } from "@tanstack/react-query";
+import NearbyComponent from "./nearbyComponent";
 
 type Content =
     { type: 'Home';        data: Home }
@@ -23,14 +26,15 @@ export default function MarkerDetail({ item }: { item: Place }) {
 
   const { toggle, isFavorite } = useFavorites();
   const fav = isFavorite(item.id);
-  // const {index , setIndex , homeRef , nearbyPlaceRef , detailRef} = useLayoutDetail() ;
   const home = {placeName : item.placeName  , placeDetail : item.placeDetail ,
     openHours : item.openHours , closedDay : item.closedDay , phone : item.phone , placeType : item.placeType}; 
   const [content, setContent] = useState<Content>({type : "Home" , data : home});
+  const qc = useQueryClient() ; 
   
   const nearbyKey = (id : string) => ["nearby" , id , 2000 , 'food,cafe,attraction'] as const;
 
-  const fetchNearby = (item : Place) => {
+  const fetchNearby = (item : Place) => 
+    () => 
     getNearbyPlaces({
       lat: item.lat,
       lng: item.lng,
@@ -39,7 +43,7 @@ export default function MarkerDetail({ item }: { item: Place }) {
       cats: ['food', 'cafe', 'attraction'],
       sort: 'reco',
     }); // Promise<NearbyAPIResult>
-  }
+  
 
   const adaptNearby = (arr: NearbyPlace[]): NearbyPlace[] => {
     return arr.map((item) => ({
@@ -51,7 +55,49 @@ export default function MarkerDetail({ item }: { item: Place }) {
       category: item.category,
       id : item.id 
     }));
-  };
+  }; 
+
+  // 1) onClick: async + 타입 명시 + data-tab 사용
+  const onTabClick = async(e : React.MouseEvent<HTMLButtonElement>) => {
+    const tab = e.currentTarget.dataset.tab as 'Home' | 'NearbyPlace' | 'DetailPlace';
+
+    if( tab === "Home"){
+      setContent({type : "Home" , data : home}) ; 
+      return 
+    }
+
+     if(tab === "NearbyPlace" ){
+      const key = nearbyKey(item.id);
+
+         // 1) 캐시에 있으면 즉시 UI 업데이트
+        const cached = qc.getQueryData<NearbyAPIResult>(key) ; 
+        if (cached) {
+          const data = adaptNearby(cached.items) ;  
+          setContent({type : "NearbyPlace" , data}) ; 
+
+          // 백그라운드 최신화(선택) : 신선도 유지 
+          qc.invalidateQueries({queryKey : key ,exact : true}) ; 
+          return ; 
+        }
+            // 2) 캐시에 없으면 가져오고(ensureQueryData는 히트면 재요청 안 함)
+        try{
+          const res = await qc.ensureQueryData({
+            queryKey : key , 
+            queryFn :fetchNearby(item) ,
+            staleTime : 5 * 60 * 1000, // 5분 동안 신선
+              }
+        
+        )
+        setContent({type : "NearbyPlace" , data : res.items}) ;
+        
+
+        }catch(e){
+          // 에러뷰 
+    
+        
+    }
+    
+  }
 
 
   const onToggle = useCallback(() => {
@@ -109,22 +155,7 @@ export default function MarkerDetail({ item }: { item: Place }) {
     return `inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold ring-1 ${base}`;
   }, [item.category]);
   
-  // 1) onClick: async + 타입 명시 + data-tab 사용
-  const onTabClick = async(e : React.MouseEvent<HTMLButtonElement>) => {
-    const tab = e.currentTarget.dataset.tab as 'Home' | 'NearbyPlace' | 'DetailPlace';
-
-    if( tab === "Home"){
-      setContent({type : "Home" , data : home}) ; 
-      return 
-    }
-
-    else if(tab === "NearbyPlace" ){
-      const key = nearbyKey(item.id);
-
-         // 1) 캐시에 있으면 즉시 UI 업데이트
-    }
-    
-  }
+  
 
   return (
     // 시맨틱을 위해 DOM 순서는 본문 → 이미지(아래). 시각적으로도 아래에 보이도록 flex-col
@@ -210,7 +241,7 @@ export default function MarkerDetail({ item }: { item: Place }) {
         <div className="relative h-[280px] sm:h-[300px] overflow-hidden rounded-2xl">
           {thumb && !error ? (
             <Image
-              src={thumb}
+              src={thumb ?? ""}
               alt={item.title}
               fill
               sizes="100vw"
@@ -239,8 +270,10 @@ export default function MarkerDetail({ item }: { item: Place }) {
           <button onClick={onTabClick } data-tab= "NearbyPlace">주변</button>
           <button onClick={onTabClick } data-tab = "DetailPlace">정보</button>
         </div>
-        {content && content.type === "NearbyPlace" && <HomeComponent value = {content.data}/> }  
-      </div>
+        {content && content.type === "Home" && <HomeComponent value = {content.data}/>} 
+        {content && content.type === "NearbyPlace" && <NearbyComponent value = {content.data}/>} 
+
+        </div>
     </section>
   );
 }
