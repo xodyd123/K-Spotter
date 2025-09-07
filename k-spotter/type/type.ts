@@ -8,8 +8,12 @@ export interface Place {
     contentTypeId? : number 
     category: string 
     address : string 
-    place_name : string 
-
+    placeName : string 
+    placeType : string ;
+    placeDetail : string ; 
+    openHours : string ; 
+    closedDay : string ; 
+    phone : string ;
 }
 
 export type TourItem = {
@@ -17,10 +21,33 @@ export type TourItem = {
     contenttypeid?: string | number;  // ✅ 유형 (Place.contentTypeId에 매핑)
     mapx?: string | number;           // 경도
     mapy?: string | number;           // 위도
-    title?: string;
+    title: string;
     addr1?: string;
     firstimage?: string;
   };
+
+ 
+  export type Home = {
+    placeType : string ;
+    placeDetail : string ; 
+    openHours : string ; 
+    closedDay : string ; 
+    phone : string ;
+  }
+
+export type NearbyPlace = {
+    addr : string ;
+    id : string ; 
+    lat : number ; 
+    lng : number ;  
+    title : string ; 
+    category? :string ; 
+    thumb : string ;  
+}   
+
+export type DetailPlace = { // 임시 
+    contnent : string 
+} 
   
 
 

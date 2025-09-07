@@ -189,7 +189,7 @@ export default function Page() {
     clearRadiusRing();
     drawRadiusRing(pos, radiusM);
     clearNearbyMarkers();
-    renderNearbyMarkers({ lat: item.lat, lng: item.lng }, radiusM);
+    renderNearbyMarkers({ lat: item.lat, lng: item.lng , id:item.id  }, radiusM);
   }
 
   async function onNearbyMarkerClick(item: Place, marker: any) {
@@ -231,7 +231,7 @@ export default function Page() {
   }
 
   async function renderNearbyMarkers(
-    center: { lat: number; lng: number },
+    center: { lat: number; lng: number ; id:string},
     radius = radiusM
   ) {
     const { kakao } = window as any;
@@ -245,6 +245,7 @@ export default function Page() {
       const result = await getNearbyPlaces({
         lat: center.lat,
         lng: center.lng,
+        id : center.id , 
         radius,
         cats: ["food", "cafe", "attraction"],
         sort: "reco",

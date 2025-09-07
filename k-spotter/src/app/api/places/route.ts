@@ -70,9 +70,13 @@ export async function GET(req: NextRequest) {
     SELECT
       spot_id AS id,
       lat, lng,
-      title, place_name, address,
+      title, address,
       media_type AS category,      -- 프런트 타입에 맞춰 별칭
-      place_type
+      place_type AS placeType , 
+      place_detail AS "placeDetail",
+      open_hours   AS "openHours",
+      place_name As placeName,
+      phone
     FROM public.spots
     ${where}
     ${order}
