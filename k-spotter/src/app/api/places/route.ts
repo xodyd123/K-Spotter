@@ -34,7 +34,6 @@ const pointInBbox = (bbox: BBoxArr, lat: number, lng: number): boolean => {
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-
   // 프런트에서 보내는 카테고리(Drama/Movie/MusicVideo) → DB의 media_type
   const cats = sp.getAll("category"); // 예: ?category=Drama&category=Movie
   const bbox = parseBbox(sp.get("bbox")); // "minLng,minLat,maxLng,maxLat"
@@ -73,11 +72,12 @@ export async function GET(req: NextRequest) {
       title, address,
       media_type AS category,      -- 프런트 타입에 맞춰 별칭
       place_type AS placeType , 
-      place_detail AS "placeDetail",
-      open_hours   AS "openHours",
+      place_detail AS placeDetail,
+      open_hours   AS openHours,
       place_name As placeName,
-      phone
-    FROM public.spots
+      phone,
+      closed_day AS closedDay 
+      FROM public.spots
     ${where}
     ${order}
     LIMIT $${i};

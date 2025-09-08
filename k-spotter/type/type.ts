@@ -8,11 +8,11 @@ export interface Place {
     contentTypeId? : number 
     category: string 
     address : string 
-    placeName : string 
-    placeType : string ;
-    placeDetail : string ; 
-    openHours : string ; 
-    closedDay : string ; 
+    placename : string 
+    placetype : string ;
+    placedetail : string ; 
+    openhours : string ; 
+    closedday : string ; 
     phone : string ;
 }
 
@@ -28,10 +28,9 @@ export type TourItem = {
 
  
   export type Home = {
-    placeType : string ;
-    placeDetail : string ; 
+    address : string ;
     openHours : string ; 
-    closedDay : string ; 
+    closedday : string ; 
     phone : string ;
   }
 
