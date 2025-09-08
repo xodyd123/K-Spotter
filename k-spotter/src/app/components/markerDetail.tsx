@@ -9,6 +9,7 @@ import HomeComponent from "./homeContnet";
 import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
 import { useQueryClient } from "@tanstack/react-query";
 import NearbyComponent from "./nearbyComponent";
+import { useNearbyPlace } from "@/hooks/useNearbyPlaces";
 
 type Content =
   | { type: "Home"; data: Home }
@@ -18,6 +19,21 @@ type Content =
 
 type NearbyAPIResult = { items: NearbyPlace[]; count: number };
 
+// 키 빌더: contentTypeId까지 포함해 동일 키 보장
+const nearbyKey = (id: string, ctype: number | null) =>
+  ["nearby", id, 2000, ctype ?? "all"] as const;
+
+// 칩 정의
+type CatId = "all" | "12" | "39" | "14" | "38";
+const CATS: { id: CatId; label: string; ctype: number | null; icon: string }[] =
+  [
+    { id: "all", label: "전체", icon: "✨", ctype: null },
+    { id: "12", label: "관광지", icon: "🏛️", ctype: 12 },
+    { id: "39", label: "음식점", icon: "🍜", ctype: 39 },
+    { id: "14", label: "문화시설", icon: "🎭", ctype: 14 },
+    { id: "38", label: "쇼핑", icon: "🛍️", ctype: 38 },
+  ];
+
 export default function MarkerDetail({ item }: { item: Place }) {
   const [thumb, setThumb] = useState<string | null>(item.thumb ?? null);
   const [loading, setLoading] = useState<boolean>(!!item.thumb);
@@ -25,6 +41,7 @@ export default function MarkerDetail({ item }: { item: Place }) {
 
   const { toggle, isFavorite } = useFavorites();
   const fav = isFavorite(item.id);
+  const { cat, setCat, data, isFetching, prefetch } = useNearbyPlace(item);
 
   const home = {
     placename: item.placename,
@@ -105,6 +122,12 @@ export default function MarkerDetail({ item }: { item: Place }) {
     // (참고) DetailPlace 탭 클릭 시 동작은 아직 미구현
   }; // ← onTabClick 닫힘
 
+  const onCategoryToggle = (id : CatId  ) => {
+    prefetch(id) 
+    console.log("data" ,data); 
+    setContent({ type: "NearbyPlace" ,  data } )
+  }
+
   const onToggle = useCallback(() => {
     toggle({
       id: item.id,
@@ -124,7 +147,9 @@ export default function MarkerDetail({ item }: { item: Place }) {
   const onCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(
-        `${item.placename || item.title}\n${item.address}\n(${item.lat}, ${item.lng})`
+        `${item.placename || item.title}\n${item.address}\n(${item.lat}, ${
+          item.lng
+        })`
       );
       alert("주소가 복사되었습니다.");
     } catch {
@@ -133,7 +158,7 @@ export default function MarkerDetail({ item }: { item: Place }) {
   }, [item.address, item.lat, item.lng, item.placeName, item.title]);
 
   const onShare = useCallback(async () => {
-    const text = `${item.placeName || item.title} • ${item.address}`;
+    const text = `${item.placename || item.title} • ${item.address}`;
     const url = `https://map.kakao.com/link/to/${encodeURIComponent(
       item.title
     )},${item.lat},${item.lng}`;
@@ -278,11 +303,38 @@ export default function MarkerDetail({ item }: { item: Place }) {
           </button>
         </div>
 
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-2"></div>
+
         {content && content.type === "Home" && (
           <HomeComponent value={content.data} />
         )}
         {content && content.type === "NearbyPlace" && (
-          <NearbyComponent value={content.data} />
+          <>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
+              {CATS.map((c) => {
+                const active = cat === c.id;
+                return (
+                  <button
+                  key={c.id}
+                  onPointerEnter={() => onCategoryToggle(c.id)}
+                  onTouchStart={() => onCategoryToggle(c.id)}
+                  onClick={() => setCat(c.id)}
+                  aria-pressed={active}
+                  className={[
+                    "whitespace-nowrap rounded-full px-3 py-1.5 text-sm ring-1",
+                    active
+                      ? "bg-indigo-600 text-white ring-indigo-600"
+                      : "bg-white text-gray-700 ring-gray-300 hover:bg-gray-50"
+                  ].join(" ")}
+                >
+                    <span className="mr-1">{c.icon}</span>
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+            <NearbyComponent value={content.data} />
+          </>
         )}
       </div>
     </section>
