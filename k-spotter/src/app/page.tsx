@@ -18,8 +18,7 @@ import { getSpotter } from "@/lib/mock/apitour/getSpotter";
 import { GetKeywordSearch } from "../lib/mock/apitour/getKeyword";
 import { SearchImage } from "@/lib/mock/galley/searchImage";
 
-import { useSelectedLoader } from "../hooks/fetchImage"
-
+import { useSelectedLoader } from "../hooks/fetchImage";
 
 declare global {
   interface Window {
@@ -44,7 +43,7 @@ export default function Page() {
     const fromStore = localStorage.getItem("devhud") === "1";
     return query || fromStore;
   });
-  
+
   const [userCategory, setCategory] = useState<Record<ca, boolean>>({
     Drama: false,
     Movie: false,
@@ -88,8 +87,6 @@ export default function Page() {
     setSelected,
   });
 
-
-
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
 
@@ -112,8 +109,10 @@ export default function Page() {
 
   function bboxToString(bb: BBox): string {
     const f = (n: number) => n.toFixed(6);
-    const minLng = bb.sw[1], minLat = bb.sw[0];
-    const maxLng = bb.ne[1], maxLat = bb.ne[0];
+    const minLng = bb.sw[1],
+      minLat = bb.sw[0];
+    const maxLng = bb.ne[1],
+      maxLat = bb.ne[0];
     return `${f(minLng)},${f(minLat)},${f(maxLng)},${f(maxLat)}`;
   }
 
@@ -151,6 +150,7 @@ export default function Page() {
 
   async function onMarkerClick(item: Place, marker: any) {
     // 1. 즉시 반응
+  
     setSelected(item);
     setSheet("half");
     loadAndPatchSelected(item); // 비동기 로딩은 뒤에서 진행
@@ -189,10 +189,11 @@ export default function Page() {
     clearRadiusRing();
     drawRadiusRing(pos, radiusM);
     clearNearbyMarkers();
-    renderNearbyMarkers({ lat: item.lat, lng: item.lng }, radiusM);
+    renderNearbyMarkers({ lat: item.lat, lng: item.lng, id: item.id }, radiusM);
   }
 
   async function onNearbyMarkerClick(item: Place, marker: any) {
+    
     setSelected(item);
     setSheet("half"); // 의미상 half로 열되, 가리면 보정
 
@@ -226,12 +227,12 @@ export default function Page() {
     });
 
     // 기존 반경 링/근처마커 로직
-   // clearRadiusRing();
-   // clearNearbyMarkers();
+    // clearRadiusRing();
+    // clearNearbyMarkers();
   }
 
   async function renderNearbyMarkers(
-    center: { lat: number; lng: number },
+    center: { lat: number; lng: number; id: string },
     radius = radiusM
   ) {
     const { kakao } = window as any;
@@ -245,12 +246,12 @@ export default function Page() {
       const result = await getNearbyPlaces({
         lat: center.lat,
         lng: center.lng,
+        id: center.id,
         radius,
         cats: ["food", "cafe", "attraction"],
         sort: "reco",
       });
       const { items } = result;
-
 
       const markers = items.map((it: any) => {
         const marker = new kakao.maps.Marker({
@@ -291,23 +292,24 @@ export default function Page() {
       Object.entries(userCategory)
         .filter(([, v]) => v)
         .forEach(([k]) => qs.append("category", k));
-  
+
       // ⚠️ bboxToString은 반드시 minLng,minLat,maxLng,maxLat(경도→위도 순서)
       qs.append("bbox", bboxToString(bbox));
-      qs.append("mode", "points");              // points 모드 강제
+      qs.append("mode", "points"); // points 모드 강제
       // qs.append("limit", String(MAX_POINTS));   // 500개 제한
-  
-      const res = await fetch(`/api/places?${qs.toString()}`, { signal: ac.signal });
-    
+
+      const res = await fetch(`/api/places?${qs.toString()}`, {
+        signal: ac.signal,
+      });
+
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const places: Place[] = await res.json();
-     
+
       if (id !== reqSeq.current) return;
-  
+
       // 기존 마커 제거 후 다시 그림(지금 방식 그대로)
       markersRef.current.forEach((m: any) => m.setMap(null));
       markersRef.current = [];
-  
 
       // 새 마커 + 클릭 핸들러
       const { kakao } = window as any;
@@ -399,8 +401,6 @@ export default function Page() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  
 
   useEffect(() => () => cancel(), [cancel]); // 언마운트 시 진행중 요청취소
 
@@ -641,17 +641,15 @@ pointer-events-auto"
       </div>
 
       {isDev && boundsText && (
-  <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1 pointer-events-none">
-    {boundsText}
-  </div>
-)}
+        <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1 pointer-events-none">
+          {boundsText}
+        </div>
+      )}
       <SheetProvider onclose={onCloseSheet}>
         <BottomSheet
           selected={selected}
           sheet={sheet}
-      
-          setSheet= {setSheet}
-          
+          setSheet={setSheet}
           yOverride={sheetYOverride}
         />
       </SheetProvider>
