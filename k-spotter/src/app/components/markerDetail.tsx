@@ -2,36 +2,27 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-
 import { useFavorites } from "@/hooks/useLocalStorage";
-import { DetailPlace, Home, NearbyPlace, Place } from "../../../type/type";
+import { DetailPlace, Home,  Place } from "../../../type/type";
 import HomeComponent from "./homeContnet";
-import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
-import { useQueryClient } from "@tanstack/react-query";
 import NearbyComponent from "./nearbyComponent";
 import { useNearbyPlace } from "@/hooks/useNearbyPlaces";
 
 type Content =
   | { type: "Home"; data: Home }
-  | { type: "NearbyPlace"; data: NearbyPlace[] }
+  | { type: "NearbyPlace" }
   | { type: "DetailPlace"; data: DetailPlace }
   | null;
 
-type NearbyAPIResult = { items: NearbyPlace[]; count: number };
-
-// 키 빌더: contentTypeId까지 포함해 동일 키 보장
-const nearbyKey = (id: string, ctype: number | null) =>
-  ["nearby", id, 2000, ctype ?? "all"] as const;
 
 // 칩 정의
 type CatId = "all" | "12" | "39" | "14" | "38";
-const CATS: { id: CatId; label: string; ctype: number | null; icon: string }[] =
+const CATS: { id: CatId; label: string; ctype: number | null;  }[] =
   [
-    { id: "all", label: "전체", icon: "✨", ctype: null },
-    { id: "12", label: "관광지", icon: "🏛️", ctype: 12 },
-    { id: "39", label: "음식점", icon: "🍜", ctype: 39 },
-    { id: "14", label: "문화시설", icon: "🎭", ctype: 14 },
-    { id: "38", label: "쇼핑", icon: "🛍️", ctype: 38 },
+    { id: "12", label: "관광지",  ctype: 12 },
+    { id: "39", label: "음식점",  ctype: 39 },
+    { id: "14", label: "문화시설",  ctype: 14 },
+    { id: "38", label: "쇼핑", ctype: 38 },
   ];
 
 export default function MarkerDetail({ item }: { item: Place }) {
@@ -39,6 +30,7 @@ export default function MarkerDetail({ item }: { item: Place }) {
   const [loading, setLoading] = useState<boolean>(!!item.thumb);
   const [error, setError] = useState<boolean>(false);
 
+  
   const { toggle, isFavorite } = useFavorites();
   const fav = isFavorite(item.id);
   const { cat, setCat, data, isFetching, prefetch } = useNearbyPlace(item);
@@ -54,32 +46,7 @@ export default function MarkerDetail({ item }: { item: Place }) {
 
   const [content, setContent] = useState<Content>({ type: "Home", data: home });
 
-  const qc = useQueryClient();
-
-  const nearbyKey = (id: string) =>
-    ["nearby", id, 2000, "food,cafe,attraction"] as const;
-
-  const fetchNearby = (p: Place) => () =>
-    getNearbyPlaces({
-      lat: p.lat,
-      lng: p.lng,
-      id: p.id,
-      radius: 2000,
-      cats: ["food", "cafe", "attraction"],
-      sort: "reco",
-    }); // Promise<NearbyAPIResult>
-
-  const adaptNearby = (arr: NearbyPlace[]): NearbyPlace[] => {
-    return arr.map((n) => ({
-      addr: n.addr,
-      title: n.title,
-      lat: n.lat,
-      lng: n.lng,
-      thumb: n.thumb,
-      category: n.category,
-      id: n.id,
-    }));
-  };
+  
 
   // 1) onClick: async + 타입 명시 + data-tab 사용
   const onTabClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -94,38 +61,44 @@ export default function MarkerDetail({ item }: { item: Place }) {
     }
 
     if (tab === "NearbyPlace") {
-      const key = nearbyKey(item.id);
+      // const key = nearbyKey(item.id); 
+      setContent({type : "NearbyPlace" })
 
-      // 1) 캐시에 있으면 즉시 UI 업데이트
-      const cached = qc.getQueryData<NearbyAPIResult>(key);
-      if (cached) {
-        const data = adaptNearby(cached.items);
-        setContent({ type: "NearbyPlace", data });
+      // // 1) 캐시에 있으면 즉시 UI 업데이트
+      // const cached = qc.getQueryData<NearbyAPIResult>(key);
+      // if (cached) {
+        
+      //   const data = adaptNearby(cached.items);
+      //   setContent({ type: "NearbyPlace", data });
 
-        // 백그라운드 최신화(선택)
-        qc.invalidateQueries({ queryKey: key, exact: true });
-        return;
-      }
+      //   // 백그라운드 최신화(선택)
+      //   qc.invalidateQueries({ queryKey: key, exact: true });
+      //   return;
+      // }
 
-      // 2) 캐시에 없으면 가져오기(히트면 재요청 안 함)
-      try {
-        const res = await qc.ensureQueryData<NearbyAPIResult>({
-          queryKey: key,
-          queryFn: fetchNearby(item),
-          staleTime: 5 * 60 * 1000, // 5분
-        });
-        setContent({ type: "NearbyPlace", data: res.items });
-      } catch (e) {
-        // 에러뷰
-      }
+      // // 2) 캐시에 없으면 가져오기(히트면 재요청 안 함)
+      // try {
+      
+      //   const res = await qc.ensureQueryData<NearbyAPIResult>({
+      //     queryKey: key,
+      //     queryFn: fetchNearby(item),
+      //     staleTime: 5 * 60 * 1000, // 5분
+      //   });
+      //   console.log("res" , res.items); 
+      //   setContent({ type: "NearbyPlace", data: res.items });
+      // } catch (e) {
+      //   // 에러뷰
+      // }
     }
     // (참고) DetailPlace 탭 클릭 시 동작은 아직 미구현
-  }; // ← onTabClick 닫힘
+  }; // ← onTabClick 닫힘 
 
-  const onCategoryToggle = (id : CatId  ) => {
+
+  const onCategoryToggle =   (id : CatId  ) => {
     prefetch(id) 
-    console.log("data" ,data); 
-    setContent({ type: "NearbyPlace" ,  data } )
+
+    
+    
   }
 
   const onToggle = useCallback(() => {
@@ -155,7 +128,7 @@ export default function MarkerDetail({ item }: { item: Place }) {
     } catch {
       alert("복사에 실패했어요.");
     }
-  }, [item.address, item.lat, item.lng, item.placeName, item.title]);
+  }, [item.address, item.lat, item.lng, item.placename, item.title]);
 
   const onShare = useCallback(async () => {
     const text = `${item.placename || item.title} • ${item.address}`;
@@ -303,7 +276,6 @@ export default function MarkerDetail({ item }: { item: Place }) {
           </button>
         </div>
 
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-2"></div>
 
         {content && content.type === "Home" && (
           <HomeComponent value={content.data} />
@@ -316,7 +288,7 @@ export default function MarkerDetail({ item }: { item: Place }) {
                 return (
                   <button
                   key={c.id}
-                  onPointerEnter={() => onCategoryToggle(c.id)}
+                  onFocus={() => onCategoryToggle(c.id)} // 현재 적용 안됨 
                   onTouchStart={() => onCategoryToggle(c.id)}
                   onClick={() => setCat(c.id)}
                   aria-pressed={active}
@@ -327,13 +299,13 @@ export default function MarkerDetail({ item }: { item: Place }) {
                       : "bg-white text-gray-700 ring-gray-300 hover:bg-gray-50"
                   ].join(" ")}
                 >
-                    <span className="mr-1">{c.icon}</span>
-                    {c.label}
+                    <span className="mr-1"> {c.label}</span>
+                   
                   </button>
                 );
               })}
             </div>
-            <NearbyComponent value={content.data} />
+            <NearbyComponent value={data} />
           </>
         )}
       </div>
