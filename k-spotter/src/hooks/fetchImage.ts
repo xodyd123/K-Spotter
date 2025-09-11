@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useRef } from "react";
-import { Place } from "../../type/type";
+import { NearbyPlace, Place, PlaceM } from "../../type/type";
 
 type PhotoItem = {
   galWebImageUrl?: string; // 실제 타입에 맞게 보강
@@ -16,7 +16,7 @@ type Deps = {
   }) => Promise<any[]>;
   GetKeywordSearch: (a: { keyword: string  ; signal : AbortSignal}) => Promise<Place[]>;
   SearchImage: (a: { title: string ; signal : AbortSignal }) => Promise<PhotoItem[]>;
-  setSelected: React.Dispatch<React.SetStateAction<Place | null>>;
+  setSelected: React.Dispatch<React.SetStateAction<PlaceM | null>>;
 };
 
 export function useSelectedLoader({ getSpotter, GetKeywordSearch, SearchImage, setSelected }: Deps) {

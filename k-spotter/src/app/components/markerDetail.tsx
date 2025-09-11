@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useFavorites } from "@/hooks/useLocalStorage";
-import { DetailPlace, Home,  Place } from "../../../type/type";
+import { DetailPlace, Home,  NearbyPlace,  Place, PlaceM, Sum, toPlaceM } from "../../../type/type";
 import HomeComponent from "./homeContnet";
 import NearbyComponent from "./nearbyComponent";
 import { useNearbyPlace } from "@/hooks/useNearbyPlaces";
+import { SheetState } from "./bottomSheet";
 
 type Content =
   | { type: "Home"; data: Home }
@@ -25,7 +26,9 @@ const CATS: { id: CatId; label: string; ctype: number | null;  }[] =
     { id: "38", label: "쇼핑", ctype: 38 },
   ];
 
-export default function MarkerDetail({ item }: { item: Place }) {
+ 
+
+export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM  , onSelectNearby : (n : NearbyPlace)  => void }) {
   const [thumb, setThumb] = useState<string | null>(item.thumb ?? null);
   const [loading, setLoading] = useState<boolean>(!!item.thumb);
   const [error, setError] = useState<boolean>(false);
@@ -97,7 +100,6 @@ export default function MarkerDetail({ item }: { item: Place }) {
   const onCategoryToggle =   (id : CatId  ) => {
     prefetch(id) 
 
-    
     
   }
 
@@ -305,7 +307,7 @@ export default function MarkerDetail({ item }: { item: Place }) {
                 );
               })}
             </div>
-            <NearbyComponent value={data} />
+            <NearbyComponent value={data}  onSelectNearby={ onSelectNearby} />
           </>
         )}
       </div>

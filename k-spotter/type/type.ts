@@ -1,4 +1,4 @@
-export interface Place {
+export interface Place  {
     id: string
     lat: number
     lng: number
@@ -6,7 +6,7 @@ export interface Place {
     imageUrl?: string
     thumb : string | null
     contentTypeId? : number 
-    category: string 
+    category?: string 
     address : string 
     placename : string 
     placetype : string ;
@@ -15,6 +15,59 @@ export interface Place {
     closedday : string ; 
     phone : string ;
 }
+
+export type NearbyPlace = {
+    addr : string ;
+    id : string ; 
+    lat : number ; 
+    lng : number ;  
+    title : string ; 
+    category? :string ; 
+    thumb : string ;  
+}   
+export type PlaceM = {
+    id: string;
+    lat: number;
+    lng: number;
+    title: string;
+    category?: string;
+    thumb: string | null;        // ← 통일
+    address?: string;            // Nearby.addr → 여기로 매핑
+    placename?: string;
+    placetype?: string;
+    openhours?: string;
+    closedday?: string;
+    phone?: string;
+    contentTypeId?: number;
+    source: 'place' | 'nearby';  // ← 반드시 리터럴 유니온
+  };
+  
+  export function toPlaceM(x: Place | NearbyPlace): PlaceM {
+    if ('address' in x) {
+      // Place
+      return {
+        id: x.id, lat: x.lat, lng: x.lng, title: x.title,
+        category: x.category,
+        thumb: x.thumb ?? null,
+        address: x.address,
+        placename: x.placename,
+        placetype: x.placetype,
+        openhours: x.openhours,
+        closedday: x.closedday,
+        phone: x.phone,
+        contentTypeId: x.contentTypeId,
+        source: 'place' as const,   // ★ 리터럴로 고정
+      };
+    }
+    // NearbyPlace
+    return {
+      id: x.id, lat: x.lat, lng: x.lng, title: x.title,
+      category: x.category,
+      thumb: x.thumb ?? null,
+      address: x.addr,              // ★ addr → address로 통일
+      source: 'nearby' as const,    // ★ 리터럴로 고정
+    };
+  }
 
 export type TourItem = {
     contentid?: string | number;      // ✅ 고유 ID (dedupe/Place.id에 사용)
@@ -28,21 +81,12 @@ export type TourItem = {
 
  
   export type Home = {
-    address : string ;
-    openHours : string ; 
-    closedday : string ; 
-    phone : string ;
+    address : string | undefined;
+    openHours : string | undefined;
+    closedday : string | undefined;
+    phone : string | undefined; 
   }
 
-export type NearbyPlace = {
-    addr : string ;
-    id : string ; 
-    lat : number ; 
-    lng : number ;  
-    title : string ; 
-    category? :string ; 
-    thumb : string ;  
-}   
 
 export type DetailPlace = { // 임시 
     contnent : string 

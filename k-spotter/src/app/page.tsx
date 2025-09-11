@@ -2,11 +2,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BBox, ca, LatLng, Pins, Place } from "../../type/type";
+import { BBox, ca, LatLng, NearbyPlace, Pins, Place, PlaceM, toPlaceM } from "../../type/type";
 import SearchBar from "./components/searchBar";
 import CategoryRow from "./components/categoryRow";
 import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
-import BottomSheet from "./components/bottomSheet";
+import BottomSheet, { SheetHandle } from "./components/bottomSheet";
 import {
   getViewportHeight,
   desiredVisiblePx,
@@ -19,6 +19,7 @@ import { GetKeywordSearch } from "../lib/mock/apitour/getKeyword";
 import { SearchImage } from "@/lib/mock/galley/searchImage";
 
 import { useSelectedLoader } from "../hooks/fetchImage";
+import { waitMapIdle } from "@/utils/waitMapIdle";
 
 declare global {
   interface Window {
@@ -77,7 +78,7 @@ export default function Page() {
 
   type SheetState = "closed" | "peek" | "half" | "full";
   const [sheet, setSheet] = useState<SheetState>("closed");
-  const [selected, setSelected] = useState<Place | null>(null);
+  const [selected, setSelected] = useState<PlaceM | null>(null);
   const [sheetYOverride, setSheetYOverride] = useState<string | null>(null);
 
   const { loadAndPatchSelected, cancel } = useSelectedLoader({
@@ -90,7 +91,33 @@ export default function Page() {
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
 
-  const reqSeq = useRef(0);
+  const reqSeq = useRef(0); 
+  const clickRef = useRef(false) ;
+  const sheetRef = useRef<SheetHandle>(null); 
+
+  const onSelectNearby = useCallback(async (n : NearbyPlace)=>{
+    if(clickRef.current) return ;
+    clickRef.current = true ;  
+    try{
+      await sheetRef.current?.close("closed") ; 
+
+      // 마커 업데이트 
+      setSelected(toPlaceM(n)) ; 
+
+      // 지도 이동 + idle 대기 
+      const pos = new kakao.maps.LatLng(n.lat , n.lng)
+      const vh = getViewportHeight(map.current) ; 
+      const visiblePx = desiredVisiblePx(vh, 'half');
+      ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, { gap: 12, factor: 0.6, maxPan: 120, eps: 2 });
+      await waitMapIdle(map.current); // idle 이벤트 대기
+
+      // (D) 시트 다시 열림 애니 끝까지 대기 
+      await sheetRef.current?.open("half") ; 
+    } 
+    finally{
+      clickRef.current = false ; 
+    }
+  } , [])
 
   const onCategoryClick = useCallback((cat: ca) => {
     setCategory((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -98,7 +125,9 @@ export default function Page() {
 
   const DEBOUNCE_MS = 300;
   const EPS_CENTER_DEG = 0.0005; // 중심 이동 임계
-  const EPS_AREA_RATIO = 0.02; // 면적 변화 임계 (2%)
+  const EPS_AREA_RATIO = 0.02; // 면적 변화 임계 (2%) 
+
+  const shref = useRef<SheetHandle| null>(null); 
 
   function readMapBBox(m: any): BBox {
     const b = m.getBounds();
@@ -151,7 +180,7 @@ export default function Page() {
   async function onMarkerClick(item: Place, marker: any) {
     // 1. 즉시 반응
   
-    setSelected(item);
+    setSelected(toPlaceM(item));
     setSheet("half");
     loadAndPatchSelected(item); // 비동기 로딩은 뒤에서 진행
     //2. 비동기로 이미지 추천
@@ -194,7 +223,7 @@ export default function Page() {
 
   async function onNearbyMarkerClick(item: Place, marker: any) {
     
-    setSelected(item);
+    setSelected(toPlaceM(item)) ;
     setSheet("half"); // 의미상 half로 열되, 가리면 보정
 
     const pos = marker.getPosition();
@@ -647,10 +676,12 @@ pointer-events-auto"
       )}
       <SheetProvider onclose={onCloseSheet}>
         <BottomSheet
+          ref={shref}
           selected={selected}
           sheet={sheet}
           setSheet={setSheet}
           yOverride={sheetYOverride}
+          onSelectNearby = {onSelectNearby }
         />
       </SheetProvider>
     </div>

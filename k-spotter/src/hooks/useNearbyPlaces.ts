@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getNearbyPlaces } from '@/lib/mock/apitour/getNearbyPlaces';
-import type { Place, NearbyPlace } from "../../../k-spotter/type/type"
+import type { Place, NearbyPlace, PlaceM } from "../../../k-spotter/type/type"
 
 export type CatId = 'all' | '12' | '14' | '38' | '39';
 
@@ -16,7 +16,7 @@ const nearbyKey = (id: string, ctype: number | null, radius = 2000) => ['nearby'
 
 type NearbyAPIResult = { items: NearbyPlace[]; count: number }; // 실제 API에 맞게 조정 
 
-export function useNearbyPlace(item : Place){
+export function useNearbyPlace(item : PlaceM){
     
     const [cat, setCat] = useState<CatId>('39');
     const qc = useQueryClient() ; 
