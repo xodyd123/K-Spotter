@@ -36,6 +36,7 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(function BottomShe
   ref
 ) {
   
+
   // 시트가 닫혀있지 않으면 오버레이/시트 표시
   const isOpen = sheet !== 'closed';
 
@@ -167,7 +168,6 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(function BottomShe
       const onEnd = (e: TransitionEvent) => {
         if (e.target !== el) return;
         if (e.propertyName && e.propertyName !== 'transform') return;
-        console.log("waitTransitionEnd")
         clearTimeout(tid);
         resolve();
       };
@@ -175,6 +175,7 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(function BottomShe
     });
 
   const change = useCallback(async (to: SheetState) => {
+
     // 다음 프레임에 상태 반영 → transition 확실히 시작
     await new Promise<void>((r) =>
       requestAnimationFrame(() => {

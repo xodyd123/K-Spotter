@@ -2,7 +2,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BBox, ca, LatLng, NearbyPlace, Pins, Place, PlaceM, toPlaceM } from "../../type/type";
+import {
+  BBox,
+  ca,
+  LatLng,
+  NearbyPlace,
+  Pins,
+  Place,
+  PlaceM,
+  toPlaceM,
+} from "../../type/type";
 import SearchBar from "./components/searchBar";
 import CategoryRow from "./components/categoryRow";
 import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
@@ -91,33 +100,79 @@ export default function Page() {
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
 
-  const reqSeq = useRef(0); 
-  const clickRef = useRef(false) ;
-  const sheetRef = useRef<SheetHandle>(null); 
+  const reqSeq = useRef(0);
+  const clickRef = useRef(false);
+  const sheetRef = useRef<SheetHandle>(null);
+  const selectedMarkerRef = useRef<any | null>(null) // 카테고리 에 있는 선택 마커 
 
-  const onSelectNearby = useCallback(async (n : NearbyPlace)=>{
-    if(clickRef.current) return ;
-    clickRef.current = true ;  
-    try{
-      await sheetRef.current?.close("closed") ; 
+  const onSelectNearby = useCallback(async (n: NearbyPlace) => {
+    if (clickRef.current) return;
+    clickRef.current = true;
+    try {
+      await sheetRef.current?.close("closed");
 
-      // 마커 업데이트 
-      setSelected(toPlaceM(n)) ; 
+      // 마커 업데이트
+      setSelected(toPlaceM(n));
 
-      // 지도 이동 + idle 대기 
-      const pos = new kakao.maps.LatLng(n.lat , n.lng)
-      const vh = getViewportHeight(map.current) ; 
-      const visiblePx = desiredVisiblePx(vh, 'half');
-      ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, { gap: 12, factor: 0.6, maxPan: 120, eps: 2 });
+      // 선택 마커 생성 및 /이동
+      ensureSelectedMarker(n.lat, n.lng);
+
+      // 지도 이동 + idle 대기
+      const pos = new kakao.maps.LatLng(n.lat, n.lng);
+      const vh = getViewportHeight(map.current);
+      const visiblePx = desiredVisiblePx(vh, "half");
+
+          // 하이브리드 결정
+      const decision = decideSheetOrPan(map.current, pos, "half");
+
+    // 3) 패닝 적용(있으면) — 둘 중 택1
+    if (decision.panBy && decision.panBy > 0) {
+      programmaticMoveCntRef.current += 1;
+    }
+
+    if (decision.yOverride) {
+      setSheetYOverride(decision.yOverride); // BottomSheet에 yOverride props로 전달
+    } else {
+      setSheetYOverride(null);
+    }
+
+    programmaticMoveCntRef.current += 1; // 자동 이동 플래그
+      
+      ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
+        gap: 12,
+        factor: 0.6,
+        maxPan: 120,
+        eps: 2,
+      });
       await waitMapIdle(map.current); // idle 이벤트 대기
 
-      // (D) 시트 다시 열림 애니 끝까지 대기 
-      await sheetRef.current?.open("half") ; 
-    } 
-    finally{
-      clickRef.current = false ; 
+      // (D) 시트 다시 열림 애니 끝까지 대기
+      await sheetRef.current?.open("half");
+    } finally {
+      clickRef.current = false;
     }
-  } , [])
+  }, []);
+
+
+// 선택 마커  함수
+const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
+  const { kakao } = window as any;
+  if (!map.current) return null;
+  const pos = new kakao.maps.LatLng(lat, lng);
+
+  if (!selectedMarkerRef.current) {
+    selectedMarkerRef.current = new kakao.maps.Marker({
+      position: pos,
+      map: map.current,
+      // image: pinRef.current?.selected, // 선택용 아이콘
+      zIndex: 3,
+    });
+  } else {
+    selectedMarkerRef.current.setPosition(pos);
+    selectedMarkerRef.current.setMap(map.current);
+  }
+  return selectedMarkerRef.current;
+}, []);
 
   const onCategoryClick = useCallback((cat: ca) => {
     setCategory((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -125,9 +180,7 @@ export default function Page() {
 
   const DEBOUNCE_MS = 300;
   const EPS_CENTER_DEG = 0.0005; // 중심 이동 임계
-  const EPS_AREA_RATIO = 0.02; // 면적 변화 임계 (2%) 
-
-  const shref = useRef<SheetHandle| null>(null); 
+  const EPS_AREA_RATIO = 0.02; // 면적 변화 임계 (2%)
 
   function readMapBBox(m: any): BBox {
     const b = m.getBounds();
@@ -179,7 +232,7 @@ export default function Page() {
 
   async function onMarkerClick(item: Place, marker: any) {
     // 1. 즉시 반응
-  
+
     setSelected(toPlaceM(item));
     setSheet("half");
     loadAndPatchSelected(item); // 비동기 로딩은 뒤에서 진행
@@ -215,91 +268,90 @@ export default function Page() {
     });
 
     // 기존 반경 링/근처마커 로직
-    clearRadiusRing();
-    drawRadiusRing(pos, radiusM);
-    clearNearbyMarkers();
-    renderNearbyMarkers({ lat: item.lat, lng: item.lng, id: item.id }, radiusM);
+  //  clearRadiusRing();
+   // drawRadiusRing(pos, radiusM);
+    //clearNearbyMarkers();
+    //renderNearbyMarkers({ lat: item.lat, lng: item.lng, id: item.id }, radiusM);
   }
 
-  async function onNearbyMarkerClick(item: Place, marker: any) {
-    
-    setSelected(toPlaceM(item)) ;
-    setSheet("half"); // 의미상 half로 열되, 가리면 보정
+  // async function onNearbyMarkerClick(item: Place, marker: any) {
+  //   setSelected(toPlaceM(item));
+  //   setSheet("half"); // 의미상 half로 열되, 가리면 보정
 
-    const pos = marker.getPosition();
-    // 시트가 현재 보이는 높이(px)
-    const vh = getViewportHeight(map.current);
-    const visiblePx = desiredVisiblePx(vh, "half");
+  //   const pos = marker.getPosition();
+  //   // 시트가 현재 보이는 높이(px)
+  //   const vh = getViewportHeight(map.current);
+  //   const visiblePx = desiredVisiblePx(vh, "half");
 
-    // 하이브리드 결정
-    const decision = decideSheetOrPan(map.current, pos, "half");
+  //   // 하이브리드 결정
+  //   const decision = decideSheetOrPan(map.current, pos, "half");
 
-    // 3) 패닝 적용(있으면) — 둘 중 택1
-    if (decision.panBy && decision.panBy > 0) {
-      programmaticMoveCntRef.current += 1;
-    }
+  //   // 3) 패닝 적용(있으면) — 둘 중 택1
+  //   if (decision.panBy && decision.panBy > 0) {
+  //     programmaticMoveCntRef.current += 1;
+  //   }
 
-    if (decision.yOverride) {
-      setSheetYOverride(decision.yOverride); // BottomSheet에 yOverride props로 전달
-    } else {
-      setSheetYOverride(null);
-    }
+  //   if (decision.yOverride) {
+  //     setSheetYOverride(decision.yOverride); // BottomSheet에 yOverride props로 전달
+  //   } else {
+  //     setSheetYOverride(null);
+  //   }
 
-    programmaticMoveCntRef.current += 1; // 자동 이동 플래그
+  //   programmaticMoveCntRef.current += 1; // 자동 이동 플래그
 
-    // 부드럽게 이동(추천)
-    ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
-      gap: 12,
-      factor: 0.6,
-      maxPan: 120,
-      eps: 2,
-    });
+  //   // 부드럽게 이동(추천)
+  //   ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
+  //     gap: 12,
+  //     factor: 0.6,
+  //     maxPan: 120,
+  //     eps: 2,
+  //   });
 
-    // 기존 반경 링/근처마커 로직
-    // clearRadiusRing();
-    // clearNearbyMarkers();
-  }
+  //   // 기존 반경 링/근처마커 로직
+  //   // clearRadiusRing();
+  //   // clearNearbyMarkers();
+  // }
 
-  async function renderNearbyMarkers(
-    center: { lat: number; lng: number; id: string },
-    radius = radiusM
-  ) {
-    const { kakao } = window as any;
+  // async function renderNearbyMarkers(
+  //   center: { lat: number; lng: number; id: string },
+  //   radius = radiusM
+  // ) {
+  //   const { kakao } = window as any;
 
-    // 취소 준비
-    nearbyAbortRef.current?.abort();
-    const ac = new AbortController();
-    nearbyAbortRef.current = ac;
+  //   // 취소 준비
+  //   nearbyAbortRef.current?.abort();
+  //   const ac = new AbortController();
+  //   nearbyAbortRef.current = ac;
 
-    try {
-      const result = await getNearbyPlaces({
-        lat: center.lat,
-        lng: center.lng,
-        id: center.id,
-        radius,
-        cats: ["food", "cafe", "attraction"],
-        sort: "reco",
-      });
-      const { items } = result;
+  //   try {
+  //     const result = await getNearbyPlaces({
+  //       lat: center.lat,
+  //       lng: center.lng,
+  //       id: center.id,
+  //       radius,
+  //       cats: ["food", "cafe", "attraction"],
+  //       sort: "reco",
+  //     });
+  //     const { items } = result;
 
-      const markers = items.map((it: any) => {
-        const marker = new kakao.maps.Marker({
-          position: new kakao.maps.LatLng(it.lat, it.lng),
-          map: map.current,
-          title: it.title,
-          zIndex: 2,
-        });
-        const handler = async () => {
-          onNearbyMarkerClick(it, marker);
-        };
-        kakao.maps.event.addListener(marker, "click", handler); // 언제 지움 ?
-        return marker;
-      });
-      nearbyMarkersRef.current = markers;
-    } catch (e: any) {
-      if (e.name !== "AbortError") console.error("nearby load failed", e);
-    }
-  }
+  //     const markers = items.map((it: any) => {
+  //       const marker = new kakao.maps.Marker({
+  //         position: new kakao.maps.LatLng(it.lat, it.lng),
+  //         map: map.current,
+  //         title: it.title,
+  //         zIndex: 2,
+  //       });
+  //       const handler = async () => {
+  //         onNearbyMarkerClick(it, marker);
+  //       };
+  //       kakao.maps.event.addListener(marker, "click", handler); // 언제 지움 ?
+  //       return marker;
+  //     });
+  //     nearbyMarkersRef.current = markers;
+  //   } catch (e: any) {
+  //     if (e.name !== "AbortError") console.error("nearby load failed", e);
+  //   }
+  // }
 
   async function fetchPlacesForBBox(bbox: BBox) {
     const id = ++reqSeq.current;
@@ -676,12 +728,12 @@ pointer-events-auto"
       )}
       <SheetProvider onclose={onCloseSheet}>
         <BottomSheet
-          ref={shref}
+          ref={sheetRef}
           selected={selected}
           sheet={sheet}
           setSheet={setSheet}
           yOverride={sheetYOverride}
-          onSelectNearby = {onSelectNearby }
+          onSelectNearby={onSelectNearby}
         />
       </SheetProvider>
     </div>

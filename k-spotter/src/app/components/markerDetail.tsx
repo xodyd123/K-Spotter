@@ -1,13 +1,13 @@
 "use client";
 
-import { SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useFavorites } from "@/hooks/useLocalStorage";
 import { DetailPlace, Home,  NearbyPlace,  Place, PlaceM, Sum, toPlaceM } from "../../../type/type";
 import HomeComponent from "./homeContnet";
 import NearbyComponent from "./nearbyComponent";
 import { useNearbyPlace } from "@/hooks/useNearbyPlaces";
-import { SheetState } from "./bottomSheet";
+
 
 type Content =
   | { type: "Home"; data: Home }
@@ -33,6 +33,7 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
   const [loading, setLoading] = useState<boolean>(!!item.thumb);
   const [error, setError] = useState<boolean>(false);
 
+
   
   const { toggle, isFavorite } = useFavorites();
   const fav = isFavorite(item.id);
@@ -48,6 +49,12 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
   };
 
   const [content, setContent] = useState<Content>({ type: "Home", data: home });
+
+  useEffect(()=>{
+    console.log("content" , content); 
+  } , [item])
+
+
 
   
 
@@ -93,14 +100,13 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
       //   // 에러뷰
       // }
     }
-    // (참고) DetailPlace 탭 클릭 시 동작은 아직 미구현
+    
   }; // ← onTabClick 닫힘 
 
 
   const onCategoryToggle =   (id : CatId  ) => {
     prefetch(id) 
 
-    
   }
 
   const onToggle = useCallback(() => {
