@@ -2,7 +2,8 @@
 "use client";
 import NearbyDetail from "../../app/components/nearbyDetail"
 import type { NearbyPlace } from "../../../type/type";
-import { useEffect } from "react";
+import { SetStateAction, useEffect } from "react";
+import { SheetState } from "./bottomSheet";
 
 
 function formatDist(d?: number | null) {
@@ -13,10 +14,8 @@ function formatDist(d?: number | null) {
 }
 
 
-export default function NearbyComponent({ value , onSelect}: { value: NearbyPlace[] ; onSelect : (p:NearbyPlace) => void}) { 
+export default function NearbyComponent({ value ,  onSelectNearby}: { value: NearbyPlace[] ; onSelectNearby :  (n: NearbyPlace) => void }) { 
 
-    
-    
  
   if (!value?.length) {
     return (
@@ -27,17 +26,14 @@ export default function NearbyComponent({ value , onSelect}: { value: NearbyPlac
   }
 
   return (
-  
-     
+
       <ul className="mt-2 grid gap-3">
         {value.map(p => (
           <li key={p.id}>
             <NearbyDetail
-              placeName={p.title}
-              thumb={p.thumb ?? undefined}
-              address={p.addr}
-              distanceText={formatDist((p as any).dist)}
-              onSelect = {onSelect} 
+               place = {p}
+              // distanceText={formatDist((p as any).dist)}
+              onSelectNearby = {onSelectNearby}
             />
           </li>
         ))}

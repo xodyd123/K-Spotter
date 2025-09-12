@@ -1,5 +1,4 @@
 'use client';
-
 import React, {
   forwardRef,
   useCallback,
@@ -8,9 +7,10 @@ import React, {
   useRef,
   useState,
   useImperativeHandle,
+  Children,
 } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { Place } from '../../../type/type';
+import type { NearbyPlace, Place, PlaceM } from '../../../type/type';
 import MarkerDetail from './markerDetail';
 
 export type SheetState = 'closed' | 'peek' | 'half' | 'full';
@@ -24,16 +24,19 @@ export type SheetHandle = {
 
 // children 허용
 type BottomSheetProps = React.PropsWithChildren<{
-  selected: Place | null;
+  selected: PlaceM | null 
   sheet: SheetState;
   setSheet: Dispatch<SetStateAction<SheetState>>;
   yOverride?: string | null; // 외부 보정(px 문자열) - 선택
+  onSelectNearby  : (n: NearbyPlace) => Promise<void>
 }>;
 
 const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(function BottomSheet(
-  { selected, sheet, setSheet, yOverride, children }: BottomSheetProps,
+  { selected, sheet, setSheet, yOverride, onSelectNearby }: BottomSheetProps,
   ref
 ) {
+  
+
   // 시트가 닫혀있지 않으면 오버레이/시트 표시
   const isOpen = sheet !== 'closed';
 
@@ -171,7 +174,8 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(function BottomShe
       el.addEventListener('transitionend', onEnd, { once: true });
     });
 
-  const change = async (to: SheetState) => {
+  const change = useCallback(async (to: SheetState) => {
+
     // 다음 프레임에 상태 반영 → transition 확실히 시작
     await new Promise<void>((r) =>
       requestAnimationFrame(() => {
@@ -180,7 +184,8 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(function BottomShe
       })
     );
     await waitTransitionEnd();
-  };
+   
+  } , [setSheet]);
 
   useImperativeHandle(
     ref,
@@ -189,7 +194,7 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(function BottomShe
       close: (to = 'closed') => change(to),
       getHeight: () => rootRef.current?.offsetHeight ?? 0,
     }),
-    [setSheet]
+    [change]
   );
 
   // ---------------- 렌더: SSR/클라이언트 일치 보장 ----------------
@@ -242,7 +247,7 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(function BottomShe
         {/* 스크롤 컨테이너: 점프 방지 */}
         <div className="h-[calc(100%-40px)] overflow-y-auto [overflow-anchor:none]">
           {/* 선택된 장소가 있으면 상세, 없으면 children(예: Nearby 리스트) */}
-          {selected ? <MarkerDetail item={selected} /> : children}
+          {selected && <MarkerDetail item={selected} onSelectNearby ={onSelectNearby} />}
         </div>
       </div>
     </>
