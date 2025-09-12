@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { category, Place, TourItem } from "../../../../type/type";
+import { category, Place, PlaceM, TourItem } from "../../../../type/type";
 
 const ENDPOINT = "https://apis.data.go.kr/B551011/KorService2/locationBasedList2";
 
@@ -42,6 +42,7 @@ function normalizeItems(j: any) {
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
 
+  
   // ✅ 클라이언트가 lat/lng로 보내면 올바르게 매핑
   const lat = sp.get("lat") ?? sp.get("mapY"); // 위도
   const lng = sp.get("lng") ?? sp.get("mapX"); // 경도
@@ -76,6 +77,7 @@ export async function GET(req: NextRequest) {
     const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) throw new Error(`TourAPI ${ctid} HTTP ${r.status}`);
     const j = await r.json(); // 필요 시 text() 분기 + XML 에러 파싱 로직 넣을 수 있음
+    
     return normalizeItems(j) as TourItem[];
   };
 
@@ -97,10 +99,12 @@ for (const s of settled) {
   }
   const uniq = Array.from(uniqMap.values());
 
+  console.log("uniq" , uniq) ;
+
  
   
   // Place 매핑 (lat=mapy, lng=mapx 주의)
-  const items: Place[] = uniq
+  const items: PlaceM[] = uniq
   .filter(it => it.mapx != null && it.mapy != null)
   .map((it, i) => {
     // 안전 파싱
@@ -115,18 +119,18 @@ for (const s of settled) {
       lat: Number(it.mapy),   // 위도
       lng: Number(it.mapx),   // 경도
       addr: it.addr1 ?? "",
-      thumb: it.firstimage ?? null,
+      thumb: it.firstimage  ?? null , 
       contentTypeId,
       category: category.OTHER,
-      placename : "ff" ,
-      address : "Ff"
-    } as Place;
+      placename : it.title ,
+      address : it.addr1 ,
+      source : "nearby" , 
+    } as PlaceM;
   });
   
   const limit = Number(sp.get("limit") ?? 100);
   const sliced = items.slice(0, limit); 
 
-  console.log("sliced" , sliced); 
  
 
   return NextResponse.json({ items: sliced, count: sliced.length });
