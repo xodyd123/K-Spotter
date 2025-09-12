@@ -247,7 +247,7 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(function BottomShe
         {/* 스크롤 컨테이너: 점프 방지 */}
         <div className="h-[calc(100%-40px)] overflow-y-auto [overflow-anchor:none]">
           {/* 선택된 장소가 있으면 상세, 없으면 children(예: Nearby 리스트) */}
-          {selected && <MarkerDetail item={selected} onSelectNearby ={onSelectNearby} />}
+          {selected && <MarkerDetail item={selected} onSelectNearby ={onSelectNearby}  sheet={sheet}  setSheet = {setSheet}/>}
         </div>
       </div>
     </>

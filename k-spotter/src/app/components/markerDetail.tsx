@@ -1,45 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useFavorites } from "@/hooks/useLocalStorage";
-import { DetailPlace,  NearbyPlace, PlaceM } from "../../../type/type";
+import { DetailPlace, NearbyPlace, PlaceM } from "../../../type/type";
 import HomeComponent from "./homeContnet";
 import NearbyComponent from "./nearbyComponent";
 import { useNearbyPlace } from "@/hooks/useNearbyPlaces";
-
+import { SheetState } from "./bottomSheet";
 
 type Content =
-  | { type: "Home"}
+  | { type: "Home" }
   | { type: "NearbyPlace" }
   | { type: "DetailPlace"; data: DetailPlace }
   | null;
 
-
 // 칩 정의
 type CatId = "all" | "12" | "39" | "14" | "38";
-const CATS: { id: CatId; label: string; ctype: number | null;  }[] =
-  [
-    { id: "12", label: "관광지",  ctype: 12 },
-    { id: "39", label: "음식점",  ctype: 39 },
-    { id: "14", label: "문화시설",  ctype: 14 },
-    { id: "38", label: "쇼핑", ctype: 38 },
-  ];
+const CATS: { id: CatId; label: string; ctype: number | null }[] = [
+  { id: "12", label: "관광지", ctype: 12 },
+  { id: "39", label: "음식점", ctype: 39 },
+  { id: "14", label: "문화시설", ctype: 14 },
+  { id: "38", label: "쇼핑", ctype: 38 },
+];
 
- 
-
-export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM  , onSelectNearby : (n : NearbyPlace)  => void }) {
+export default function MarkerDetail({
+  item,
+  onSelectNearby,
+  sheet ,  
+  setSheet , 
+}: {
+  item: PlaceM;
+  onSelectNearby: (n: NearbyPlace) => void;
+  sheet: SheetState; 
+  setSheet : Dispatch<SetStateAction<SheetState>>
+}) {
   const [thumb, setThumb] = useState<string | null>(item.thumb ?? null);
   const [loading, setLoading] = useState<boolean>(!!item.thumb);
   const [error, setError] = useState<boolean>(false);
 
-
-  
   const { toggle, isFavorite } = useFavorites();
   const fav = isFavorite(item.id);
   const { cat, setCat, data, isFetching, prefetch } = useNearbyPlace(item);
-
-  
 
   const home = {
     placename: item.placename,
@@ -50,15 +52,11 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
     address: item.address,
   };
 
-  const [content, setContent] = useState<Content>({ type: "Home"});
+  const [content, setContent] = useState<Content>({ type: "Home" });
 
-  useEffect(()=>{
-     setContent({type: "Home"})
-  } , [item.id])
-
-
-
-  
+  useEffect(() => {
+    setContent({ type: "Home" });
+  }, [item.id]);
 
   // 1) onClick: async + 타입 명시 + data-tab 사용
   const onTabClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -68,18 +66,18 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
       | "DetailPlace";
 
     if (tab === "Home") {
-      setContent({ type: "Home"});
+      setContent({ type: "Home" });
       return;
     }
 
     if (tab === "NearbyPlace") {
-      // const key = nearbyKey(item.id); 
-      setContent({type : "NearbyPlace" })
+      
+      setContent({ type: "NearbyPlace" });
 
       // // 1) 캐시에 있으면 즉시 UI 업데이트
       // const cached = qc.getQueryData<NearbyAPIResult>(key);
       // if (cached) {
-        
+
       //   const data = adaptNearby(cached.items);
       //   setContent({ type: "NearbyPlace", data });
 
@@ -90,26 +88,27 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
 
       // // 2) 캐시에 없으면 가져오기(히트면 재요청 안 함)
       // try {
-      
+
       //   const res = await qc.ensureQueryData<NearbyAPIResult>({
       //     queryKey: key,
       //     queryFn: fetchNearby(item),
       //     staleTime: 5 * 60 * 1000, // 5분
       //   });
-      //   console.log("res" , res.items); 
+      //   console.log("res" , res.items);
       //   setContent({ type: "NearbyPlace", data: res.items });
       // } catch (e) {
       //   // 에러뷰
       // }
     }
-    
-  }; // ← onTabClick 닫힘 
+  }; // ← onTabClick 닫힘
 
+  const onClose = () => {
+    setSheet("closed"); 
+  } 
 
-  const onCategoryToggle =   (id : CatId  ) => {
-    prefetch(id) 
-
-  }
+  const onCategoryToggle = (id: CatId) => {
+    prefetch(id);
+  };
 
   const onToggle = useCallback(() => {
     toggle({
@@ -170,6 +169,28 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
     // 시맨틱을 위해 DOM 순서는 본문 → 이미지(아래). 시각적으로도 아래에 보이도록 flex-col
     <section className="group flex flex-col overflow-hidden">
       {/* 본문 */}
+
+      {
+        sheet === "full" &&  <div className="flex justify-end px-3">
+        <button 
+          onClick={onClose}
+          type="button"
+          aria-label="닫기"
+          className="inline-flex h-10 w-10 items-center justify-center bg-transparent text-black hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-black/30"
+        >
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none">
+            <path
+              d="M6 6l12 12M18 6l-12 12"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      </div>
+      }
+     
+
       <div className="px-5 py-5 sm:px-6 sm:py-6">
         <div className="mb-3 flex items-start gap-3">
           <h2 className="flex-1 truncate pr-2 text-2xl sm:text-3xl font-extrabold leading-tight tracking-tight text-gray-900">
@@ -286,10 +307,7 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
           </button>
         </div>
 
-
-        {content && content.type === "Home" && (
-          <HomeComponent value={home} />
-        )}
+        {content && content.type === "Home" && <HomeComponent value={home} />}
         {content && content.type === "NearbyPlace" && (
           <>
             <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
@@ -297,25 +315,24 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
                 const active = cat === c.id;
                 return (
                   <button
-                  key={c.id}
-                  onFocus={() => onCategoryToggle(c.id)} // 현재 적용 안됨 
-                  onTouchStart={() => onCategoryToggle(c.id)}
-                  onClick={() => setCat(c.id)}
-                  aria-pressed={active}
-                  className={[
-                    "whitespace-nowrap rounded-full px-3 py-1.5 text-sm ring-1",
-                    active
-                      ? "bg-indigo-600 text-white ring-indigo-600"
-                      : "bg-white text-gray-700 ring-gray-300 hover:bg-gray-50"
-                  ].join(" ")}
-                >
+                    key={c.id}
+                    onFocus={() => onCategoryToggle(c.id)} // 현재 적용 안됨
+                    onTouchStart={() => onCategoryToggle(c.id)}
+                    onClick={() => setCat(c.id)}
+                    aria-pressed={active}
+                    className={[
+                      "whitespace-nowrap rounded-full px-3 py-1.5 text-sm ring-1",
+                      active
+                        ? "bg-indigo-600 text-white ring-indigo-600"
+                        : "bg-white text-gray-700 ring-gray-300 hover:bg-gray-50",
+                    ].join(" ")}
+                  >
                     <span className="mr-1"> {c.label}</span>
-                   
                   </button>
                 );
               })}
             </div>
-            <NearbyComponent value={data}  onSelectNearby={ onSelectNearby} />
+            <NearbyComponent value={data} onSelectNearby={onSelectNearby} />
           </>
         )}
       </div>
