@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useFavorites } from "@/hooks/useLocalStorage";
-import { DetailPlace, Home,  NearbyPlace,  Place, PlaceM, Sum, toPlaceM } from "../../../type/type";
+import { DetailPlace,  NearbyPlace, PlaceM } from "../../../type/type";
 import HomeComponent from "./homeContnet";
 import NearbyComponent from "./nearbyComponent";
 import { useNearbyPlace } from "@/hooks/useNearbyPlaces";
 
 
 type Content =
-  | { type: "Home"; data: Home }
+  | { type: "Home"}
   | { type: "NearbyPlace" }
   | { type: "DetailPlace"; data: DetailPlace }
   | null;
@@ -39,6 +39,8 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
   const fav = isFavorite(item.id);
   const { cat, setCat, data, isFetching, prefetch } = useNearbyPlace(item);
 
+  
+
   const home = {
     placename: item.placename,
     openHours: item.openhours,
@@ -48,11 +50,11 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
     address: item.address,
   };
 
-  const [content, setContent] = useState<Content>({ type: "Home", data: home });
+  const [content, setContent] = useState<Content>({ type: "Home"});
 
   useEffect(()=>{
-    console.log("content" , content); 
-  } , [item])
+     setContent({type: "Home"})
+  } , [item.id])
 
 
 
@@ -66,7 +68,7 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
       | "DetailPlace";
 
     if (tab === "Home") {
-      setContent({ type: "Home", data: home });
+      setContent({ type: "Home"});
       return;
     }
 
@@ -252,7 +254,7 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
               fill
               sizes="100vw"
               className="object-cover"
-              onLoadingComplete={() => setLoading(false)}
+              onLoad={() => setLoading(false)}
               onError={() => {
                 setLoading(false);
                 setError(true);
@@ -286,7 +288,7 @@ export default function MarkerDetail({ item ,  onSelectNearby }: { item: PlaceM 
 
 
         {content && content.type === "Home" && (
-          <HomeComponent value={content.data} />
+          <HomeComponent value={home} />
         )}
         {content && content.type === "NearbyPlace" && (
           <>
