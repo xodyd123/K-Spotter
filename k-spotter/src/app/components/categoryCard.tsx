@@ -1,17 +1,6 @@
-import { JSX } from "react";
 import { ca} from "../../../type/type"
 import { memo } from "react";
-import {
-    TvIcon,
-    FilmIcon,
-    MusicalNoteIcon,
-  } from "@heroicons/react/24/outline";
 
-const ICONS : Record<ca , (props : any) => JSX.Element> = {
-    Drama: TvIcon,
-    Movie: FilmIcon,
-    MusicVideo: MusicalNoteIcon,
-}
 
 type Props = {
     category : ca; 
@@ -22,7 +11,7 @@ type Props = {
 
 }
 function Card({ category, selected, loading, onToggle, className = "" }: Props){
-    const Icon =  ICONS[category] 
+  
 
     return (
         <button
@@ -40,8 +29,8 @@ function Card({ category, selected, loading, onToggle, className = "" }: Props){
           className,
         ].join(" ")}
       >
-        <Icon className={selected ? "h-5 w-5" : "h-5 w-5 text-gray-700"} aria-hidden />
-        {category === "MusicVideo" ? "뮤직비디오" : category === "Movie" ? "영화" : "드라마"}
+        
+        {category === "방탄소년단" ? "방탄소년단" : category === "아이유" ? "아이유" : "오징어게임"}
       </button>
     )
 

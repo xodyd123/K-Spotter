@@ -109,7 +109,7 @@ export enum category{
 }
 
 
-export type ca =  "Drama" | "Movie" | "MusicVideo";
+export type ca =  "아이유" | "방탄소년단" | "오징어게임";
 
 export type LatLng = [lat: number, lng: number];
 export type BBox = { sw: LatLng; ne: LatLng };
@@ -125,5 +125,7 @@ export const SHEET_FRAC = 0.92;   // 92dvh
 export const HALF_FRAC  = 0.55;   // 55dvh
 export const PEEK_PX    = 80;     // 80px
 export const GAP_PX     = 12;     // 시트 상단과 마커 사이 최소 여백
+
+export type BBoxArr = [number, number, number, number]; // [swLat, swLng, neLat, neLng]
 
 

@@ -1,9 +1,9 @@
 // app/api/places/route.ts  (예시: App Router)
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "../../../../lib/db"
+import { BBoxArr } from "../../../../type/type";
 
 
-type BBoxArr = [number, number, number, number]; // [swLat, swLng, neLat, neLng]
 
 export const runtime = "nodejs";
 
@@ -14,23 +14,23 @@ const parseBbox = (bboxStr: string | null): BBoxArr | null => {
   return parts as BBoxArr;
 };
 
-// 날짜변경선(±180°) 교차까지 안전한 포함 검사
-const pointInBbox = (bbox: BBoxArr, lat: number, lng: number): boolean => {
-  const [swLat, swLng, neLat, neLng] = bbox;
+// // 날짜변경선(±180°) 교차까지 안전한 포함 검사
+// const pointInBbox = (bbox: BBoxArr, lat: number, lng: number): boolean => {
+//   const [swLat, swLng, neLat, neLng] = bbox;
 
-  // 위도: 항상 min/max로 판정(혹시 순서가 뒤집혀 와도 안전)
-  const latMin = Math.min(swLat, neLat);
-  const latMax = Math.max(swLat, neLat);
-  const latOK = lat >= latMin && lat <= latMax;
+//   // 위도: 항상 min/max로 판정(혹시 순서가 뒤집혀 와도 안전)
+//   const latMin = Math.min(swLat, neLat);
+//   const latMax = Math.max(swLat, neLat);
+//   const latOK = lat >= latMin && lat <= latMax;
 
-  // 경도: 일반 박스 vs 날짜변경선 교차 박스
-  const wraps = swLng > neLng; // 예: sw=170, ne=-170
-  const lngOK = wraps
-    ? (lng >= swLng || lng <= neLng)
-    : (lng >= swLng && lng <= neLng);
+//   // 경도: 일반 박스 vs 날짜변경선 교차 박스
+//   const wraps = swLng > neLng; // 예: sw=170, ne=-170
+//   const lngOK = wraps
+//     ? (lng >= swLng || lng <= neLng)
+//     : (lng >= swLng && lng <= neLng);
 
-  return latOK && lngOK;
-};
+//   return latOK && lngOK;
+// };
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;

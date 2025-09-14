@@ -55,9 +55,9 @@ export default function Page() {
   });
 
   const [userCategory, setCategory] = useState<Record<ca, boolean>>({
-    Drama: false,
-    Movie: false,
-    MusicVideo: false,
+    아이유: false,
+    방탄소년단: false,
+    오징어게임: false,
   });
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -154,7 +154,7 @@ export default function Page() {
   }, []);
 
 
-// 선택 마커  함수
+// 카테고리 클릭한 마커 생성 
 const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
   const { kakao } = window as any;
   if (!map.current) return null;
@@ -372,14 +372,18 @@ const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
       // 카테고리 선택값
       Object.entries(userCategory)
         .filter(([, v]) => v)
-        .forEach(([k]) => qs.append("category", k));
-
+        .forEach(([k]) => qs.append("title", k));
+ 
+      
       // ⚠️ bboxToString은 반드시 minLng,minLat,maxLng,maxLat(경도→위도 순서)
       qs.append("bbox", bboxToString(bbox));
+
       qs.append("mode", "points"); // points 모드 강제
       // qs.append("limit", String(MAX_POINTS));   // 500개 제한
 
-      const res = await fetch(`/api/places?${qs.toString()}`, {
+      console.log("qs" , qs.toString()); 
+
+      const res = await fetch(`/api/category?${qs.toString()}`, {
         signal: ac.signal,
       });
 
@@ -567,7 +571,7 @@ const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
             if (!bboxMeaningfullyChanged(cur, lastFetchedBboxRef.current))
               return;
 
-            fetchPlacesForBBox(cur);
+            // fetchPlacesForBBox(cur); // 일단 주석 
 
             setBoundsText(bboxToString(cur));
           }, DEBOUNCE_MS);
@@ -665,77 +669,74 @@ const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
   }, []);
 
   return (
-    <div className="">
+    <div className="flex flex-col">
+  {/* 상단 오버레이 컨테이너 (SearchBar 아래에 CategoryRow) */}
+  <div
+    className="fixed left-1/2 top-[max(env(safe-area-inset-top),0.5rem)] -translate-x-1/2 z-20
+               w-[min(92%,720px)] px-2 pointer-events-none"
+  >
+    <div className="space-y-2 pointer-events-auto">
       <SearchBar />
-      <div
-        className="fixed left-1/2 bottom-[max(env(safe-area-inset-top),0.5rem)] -translate-x-1/2 z-20
-             w-[min(92%,720px)] px-2 pointer-events-none"
-      >
-        <div
-          className="rounded-2xl bg-white/80 backdrop-blur-md shadow-lg border border-white/60
-px-3 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar
-pointer-events-auto"
-        >
-          {/* 3) 여기서 CategoryRow “호출”(렌더링) */}
-          <CategoryRow
-            userCategory={userCategory}
-            loading={loading}
-            onCategoryClick={onCategoryClick}
-          />
-          <div className="ml-auto">
-            {showSpinner && (
-              <span className="text-xs text-black">불러오는 중…</span>
-            )}
-          </div>
-          {!loading && !loadError && fetchedMarker && markerCount === 0 && (
-            <div className="text-xs px-2 py-1 rounded bg-black border">
-              이 범위에는 결과가 없어요
-            </div>
-          )}
-          {loadError && (
-            <div className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200">
-              {loadError}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="relative w-full h-screen">
-        <div ref={mapRef} className="absolute inset-0" />{" "}
-        {/* 처음 지도 로딩 창 스켈레톤 */}
-        {/* 처음 지도 타일 스켈레톤 */}
-        {!mapReady && (
-          <div
-            className="absolute inset-0 z-30 bg-gray-100/60 backdrop-blur-sm pointer-events-none"
-            aria-hidden
-          >
-            <div className="absolute left-1/2 top-3 -translate-x-1/2 w-[min(92%,720px)] h-12 rounded-2xl bg-white/70 animate-pulse" />
-            <div className="absolute bottom-4 left-4 w-36 h-8 rounded bg-white/70 animate-pulse" />
-          </div>
-        )}
-        {/* 데이터 로딩 상태(마커 fetch) */}
-        {mapReady && showSpinner && (
-          <div className="absolute top-4 right-4 z-30 text-xs px-2 py-1 rounded bg-black/80 text-white pointer-events-none">
-            장소 불러오는 중…
-          </div>
-        )}
-      </div>
-
-      {isDev && boundsText && (
-        <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1 pointer-events-none">
-          {boundsText}
-        </div>
-      )}
-      <SheetProvider onclose={onCloseSheet}>
-        <BottomSheet
-          ref={sheetRef}
-          selected={selected}
-          sheet={sheet}
-          setSheet={setSheet}
-          yOverride={sheetYOverride}
-          onSelectNearby={onSelectNearby}
+      <div className="px-4 py-30 flex items-center overflow-x-auto no-scrollbar">
+        <CategoryRow
+          userCategory={userCategory}
+          loading={loading}
+          onCategoryClick={onCategoryClick}
         />
-      </SheetProvider>
+
+        <div className="ml-auto">
+          {showSpinner && (
+            <span className="text-xs text-black">불러오는 중…</span>
+          )}
+        </div>
+
+        {!loading && !loadError && fetchedMarker && markerCount === 0 && (
+          <div className="text-xs px-2 py-1 rounded bg-black border">
+            이 범위에는 결과가 없어요
+          </div>
+        )}
+        {loadError && (
+          <div className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200">
+            {loadError}
+          </div>
+        )}
+      </div>
     </div>
+  </div>
+
+  {/* 지도 영역은 그대로 */}
+  <div className="relative w-full h-screen">
+    <div ref={mapRef} className="absolute inset-0" />
+    {!mapReady && (
+      <div className="absolute inset-0 z-30 bg-gray-100/60 backdrop-blur-sm pointer-events-none" aria-hidden>
+        <div className="absolute left-1/2 top-3 -translate-x-1/2 w-[min(92%,720px)] h-12 rounded-2xl bg-white/70 animate-pulse" />
+        <div className="absolute bottom-4 left-4 w-36 h-8 rounded bg-white/70 animate-pulse" />
+      </div>
+    )}
+    {mapReady && showSpinner && (
+      <div className="absolute top-4 right-4 z-30 text-xs px-2 py-1 rounded bg-black/80 text-white pointer-events-none">
+        장소 불러오는 중…
+      </div>
+    )}
+  </div>
+
+  {isDev && boundsText && (
+    <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1 pointer-events-none">
+      {boundsText}
+    </div>
+  )}
+
+  <SheetProvider onclose={onCloseSheet}>
+    <BottomSheet
+      ref={sheetRef}
+      selected={selected}
+      sheet={sheet}
+      setSheet={setSheet}
+      yOverride={sheetYOverride}
+      onSelectNearby={onSelectNearby}
+    />
+  </SheetProvider>
+</div>
+
   );
 }

@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { CategoryCard } from "./categoryCard";
 import type { ca } from "../../../type/type";
 
-const categories = ["Drama", "Movie", "MusicVideo"] as const;
+const categories = ["아이유", "방탄소년단", "오징어게임"] as const;
 
 export default function CategoryRow({ userCategory, loading, onCategoryClick }:{
   userCategory: Record<ca, boolean>;
@@ -12,7 +12,7 @@ export default function CategoryRow({ userCategory, loading, onCategoryClick }:{
   const handleToggle = useCallback((c: ca) => onCategoryClick(c), [onCategoryClick]);
 
   return (
-    <div className="flex gap-1.5">
+    <div className="flex gap-8">
       {categories.map((cat) => (
         <CategoryCard
           key={`categories-${cat}`}
