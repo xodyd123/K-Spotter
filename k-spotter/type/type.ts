@@ -126,4 +126,11 @@ export const HALF_FRAC  = 0.55;   // 55dvh
 export const PEEK_PX    = 80;     // 80px
 export const GAP_PX     = 12;     // 시트 상단과 마커 사이 최소 여백
 
+export type SearchItem = {
+    name : string ; 
+    category : string ; 
+    total : string  ; 
+
+}
+
 
