@@ -691,49 +691,59 @@ export default function Page() {
   }, []);
 
   return (
-    <div className="">
-      {/* ✅ 검색창을 포지셔닝 + 더 높은 z-index */}
-      <div className="relative z-40 w-[min(92%,720px)] mx-auto px-2">
-        <SearchBar
-          inputs={inputs}
-          setInputs={setInputs}
-          setMapCover={setMapCover}
-          mapCover={mapCover}
-        />
-      </div>
+    <div>
+      {/* 🔹 검색창 컨테이너: relative + 높은 z-index */}
+      <div className="pointer-events-none fixed left-1/2 top-4 -translate-x-1/2 z-40 w-[min(92%,720px)] px-2">
+  <div className="pointer-events-auto">
+    <SearchBar
+      inputs={inputs}
+      setInputs={setInputs}
+      setMapCover={setMapCover}
+      mapCover={mapCover}
+    />
 
+    {/* 🔽 드롭다운: 검색창 바로 아래. 배경은 여기(결과 패널)에만 존재 */}
+    {mapCover === "on" && inputs.trim().length > 0 && (
+      <div className="relative">
+        <div className="absolute left-0 right-0 top-2 z-50 max-h-[55vh] overflow-y-auto">
+          <SearchContent searchKeyWord={searchKeyWord} inputs={inputs} />
+        </div>
+      </div>
+    )}
+  </div>
+</div>
+      {/* 🗺️ 지도 */}
       <div className="relative w-full h-screen">
         <div ref={mapRef} className="absolute inset-0" />
-
-    
+  
+        {/* 🌫️ 지도 딤 오버레이: 배경 클릭 시 닫힘 */}
         <div
           className={[
             "absolute inset-0 z-30 transition-opacity duration-200",
             mapCover === "off"
               ? "opacity-0 pointer-events-none"
-              : "opacity-100 pointer-events-auto",
+              : "opacity-100 pointer-events-none",
           ].join(" ")}
           aria-hidden={mapCover === "off"}
+          onClick={() => setMapCover("off")}
         >
-          {/* 배경막 */}
-          <div className="absolute inset-0 bg-white backdrop-blur-md" />
-
-          {/* 내용 박스(필요한 UI 넣기) */}
-          {mapCover === "on" && <SearchContent searchKeyWord = {searchKeyWord} inputs = {inputs} />}
+          {/* ⚠️ 흰 배경/블러 대신 가벼운 딤만 */}
+          <div className="absolute inset-0 bg-white" />
         </div>
-        {/* 데이터 로딩 상태(마커 fetch) */}
+  
         {mapReady && showSpinner && (
-          <div className="absolute top-4 right-4 z-30 text-xs px-2 py-1 rounded bg-black/80 text-white pointer-events-none">
+          <div className="absolute top-4 right-4 z-20 text-xs px-2 py-1 rounded bg-black/80 text-white pointer-events-none">
             장소 불러오는 중…
           </div>
         )}
       </div>
-
+  
       {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1 pointer-events-none">
           {boundsText}
         </div>
       )}
+  
       <SheetProvider onclose={onCloseSheet}>
         <BottomSheet
           ref={sheetRef}
