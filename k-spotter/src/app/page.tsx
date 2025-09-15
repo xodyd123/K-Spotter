@@ -10,6 +10,7 @@ import {
   Pins,
   Place,
   PlaceM,
+  SearchItem,
   toPlaceM,
 } from "../../type/type";
 import SearchBar from "./components/searchBar";
@@ -29,6 +30,8 @@ import { SearchImage } from "@/lib/mock/galley/searchImage";
 
 import { useSelectedLoader } from "../hooks/fetchImage";
 import { waitMapIdle } from "@/utils/waitMapIdle";
+import { useSearchParams } from "next/navigation";
+import SearchContent from "./components/searchContent";
 
 declare global {
   interface Window {
@@ -89,6 +92,10 @@ export default function Page() {
   const [sheet, setSheet] = useState<SheetState>("closed");
   const [selected, setSelected] = useState<PlaceM | null>(null);
   const [sheetYOverride, setSheetYOverride] = useState<string | null>(null);
+  const [inputs, setInputs] = useState("");
+  const [mapCover, setMapCover] = useState<"off" | "on">("off");
+  const [searchKeyWord , setSearch] = useState<SearchItem[]>([]); 
+  
 
   const { loadAndPatchSelected, cancel } = useSelectedLoader({
     getSpotter,
@@ -103,7 +110,7 @@ export default function Page() {
   const reqSeq = useRef(0);
   const clickRef = useRef(false);
   const sheetRef = useRef<SheetHandle>(null);
-  const selectedMarkerRef = useRef<any | null>(null) // 카테고리 에 있는 선택 마커 
+  const selectedMarkerRef = useRef<any | null>(null); // 카테고리 에 있는 선택 마커
 
   const onSelectNearby = useCallback(async (n: NearbyPlace) => {
     if (clickRef.current) return;
@@ -122,22 +129,22 @@ export default function Page() {
       const vh = getViewportHeight(map.current);
       const visiblePx = desiredVisiblePx(vh, "half");
 
-          // 하이브리드 결정
+      // 하이브리드 결정
       const decision = decideSheetOrPan(map.current, pos, "half");
 
-    // 3) 패닝 적용(있으면) — 둘 중 택1
-    if (decision.panBy && decision.panBy > 0) {
-      programmaticMoveCntRef.current += 1;
-    }
+      // 3) 패닝 적용(있으면) — 둘 중 택1
+      if (decision.panBy && decision.panBy > 0) {
+        programmaticMoveCntRef.current += 1;
+      }
 
-    if (decision.yOverride) {
-      setSheetYOverride(decision.yOverride); // BottomSheet에 yOverride props로 전달
-    } else {
-      setSheetYOverride(null);
-    }
+      if (decision.yOverride) {
+        setSheetYOverride(decision.yOverride); // BottomSheet에 yOverride props로 전달
+      } else {
+        setSheetYOverride(null);
+      }
 
-    programmaticMoveCntRef.current += 1; // 자동 이동 플래그
-      
+      programmaticMoveCntRef.current += 1; // 자동 이동 플래그
+
       ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
         gap: 12,
         factor: 0.6,
@@ -153,26 +160,25 @@ export default function Page() {
     }
   }, []);
 
+  // 선택 마커  함수
+  const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
+    const { kakao } = window as any;
+    if (!map.current) return null;
+    const pos = new kakao.maps.LatLng(lat, lng);
 
-// 선택 마커  함수
-const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
-  const { kakao } = window as any;
-  if (!map.current) return null;
-  const pos = new kakao.maps.LatLng(lat, lng);
-
-  if (!selectedMarkerRef.current) {
-    selectedMarkerRef.current = new kakao.maps.Marker({
-      position: pos,
-      map: map.current,
-      // image: pinRef.current?.selected, // 선택용 아이콘
-      zIndex: 3,
-    });
-  } else {
-    selectedMarkerRef.current.setPosition(pos);
-    selectedMarkerRef.current.setMap(map.current);
-  }
-  return selectedMarkerRef.current;
-}, []);
+    if (!selectedMarkerRef.current) {
+      selectedMarkerRef.current = new kakao.maps.Marker({
+        position: pos,
+        map: map.current,
+        // image: pinRef.current?.selected, // 선택용 아이콘
+        zIndex: 3,
+      });
+    } else {
+      selectedMarkerRef.current.setPosition(pos);
+      selectedMarkerRef.current.setMap(map.current);
+    }
+    return selectedMarkerRef.current;
+  }, []);
 
   const onCategoryClick = useCallback((cat: ca) => {
     setCategory((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -268,8 +274,8 @@ const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
     });
 
     // 기존 반경 링/근처마커 로직
-  //  clearRadiusRing();
-   // drawRadiusRing(pos, radiusM);
+    //  clearRadiusRing();
+    // drawRadiusRing(pos, radiusM);
     //clearNearbyMarkers();
     //renderNearbyMarkers({ lat: item.lat, lng: item.lng, id: item.id }, radiusM);
   }
@@ -401,7 +407,7 @@ const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
           position: new kakao.maps.LatLng(item.lat, item.lng),
           map: map.current,
           title: item.title,
-          image: img, // 👈 중요: 실제로 여기 넣어야 보입니다
+          image: img,
         });
         const handler = async () => {
           onMarkerClick(item, marker);
@@ -484,6 +490,26 @@ const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
   }, []);
 
   useEffect(() => () => cancel(), [cancel]); // 언마운트 시 진행중 요청취소
+
+  useEffect(() => {
+    if (!map.current) return;
+
+    const id = window.setTimeout(() => {
+      const param = new URLSearchParams();
+      param.append("title", inputs);
+      fetch(`/api/search?${param}`)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then((data : SearchItem[]) => {
+          setSearch([...data])
+        })
+        .catch((e) => console.error(e));
+    }, 300);
+
+    return () => clearTimeout(id);
+  }, [inputs]);
 
   useEffect(() => {
     if (!map.current) return;
@@ -665,67 +691,59 @@ const ensureSelectedMarker = useCallback((lat: number, lng: number) => {
   }, []);
 
   return (
-    <div className="">
-      <SearchBar />
-      <div
-        className="fixed left-1/2 bottom-[max(env(safe-area-inset-top),0.5rem)] -translate-x-1/2 z-20
-             w-[min(92%,720px)] px-2 pointer-events-none"
-      >
-        <div
-          className="rounded-2xl bg-white/80 backdrop-blur-md shadow-lg border border-white/60
-px-3 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar
-pointer-events-auto"
-        >
-          {/* 3) 여기서 CategoryRow “호출”(렌더링) */}
-          <CategoryRow
-            userCategory={userCategory}
-            loading={loading}
-            onCategoryClick={onCategoryClick}
-          />
-          <div className="ml-auto">
-            {showSpinner && (
-              <span className="text-xs text-black">불러오는 중…</span>
-            )}
-          </div>
-          {!loading && !loadError && fetchedMarker && markerCount === 0 && (
-            <div className="text-xs px-2 py-1 rounded bg-black border">
-              이 범위에는 결과가 없어요
-            </div>
-          )}
-          {loadError && (
-            <div className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200">
-              {loadError}
-            </div>
-          )}
+    <div>
+      {/* 🔹 검색창 컨테이너: relative + 높은 z-index */}
+      <div className="pointer-events-none fixed left-1/2 top-4 -translate-x-1/2 z-40 w-[min(92%,720px)] px-2">
+  <div className="pointer-events-auto">
+    <SearchBar
+      inputs={inputs}
+      setInputs={setInputs}
+      setMapCover={setMapCover}
+      mapCover={mapCover}
+    />
+
+    {/* 🔽 드롭다운: 검색창 바로 아래. 배경은 여기(결과 패널)에만 존재 */}
+    {mapCover === "on" && inputs.trim().length > 0 && (
+      <div className="relative">
+        <div className="absolute left-0 right-0 top-2 z-50 max-h-[55vh] overflow-y-auto">
+          <SearchContent searchKeyWord={searchKeyWord} inputs={inputs} />
         </div>
       </div>
-
+    )}
+  </div>
+</div>
+      {/* 🗺️ 지도 */}
       <div className="relative w-full h-screen">
-        <div ref={mapRef} className="absolute inset-0" />{" "}
-        {/* 처음 지도 로딩 창 스켈레톤 */}
-        {/* 처음 지도 타일 스켈레톤 */}
-        {!mapReady && (
-          <div
-            className="absolute inset-0 z-30 bg-gray-100/60 backdrop-blur-sm pointer-events-none"
-            aria-hidden
-          >
-            <div className="absolute left-1/2 top-3 -translate-x-1/2 w-[min(92%,720px)] h-12 rounded-2xl bg-white/70 animate-pulse" />
-            <div className="absolute bottom-4 left-4 w-36 h-8 rounded bg-white/70 animate-pulse" />
-          </div>
-        )}
-        {/* 데이터 로딩 상태(마커 fetch) */}
+        <div ref={mapRef} className="absolute inset-0" />
+  
+        {/* 🌫️ 지도 딤 오버레이: 배경 클릭 시 닫힘 */}
+        <div
+          className={[
+            "absolute inset-0 z-30 transition-opacity duration-200",
+            mapCover === "off"
+              ? "opacity-0 pointer-events-none"
+              : "opacity-100 pointer-events-none",
+          ].join(" ")}
+          aria-hidden={mapCover === "off"}
+          onClick={() => setMapCover("off")}
+        >
+          {/* ⚠️ 흰 배경/블러 대신 가벼운 딤만 */}
+          <div className="absolute inset-0 bg-white" />
+        </div>
+  
         {mapReady && showSpinner && (
-          <div className="absolute top-4 right-4 z-30 text-xs px-2 py-1 rounded bg-black/80 text-white pointer-events-none">
+          <div className="absolute top-4 right-4 z-20 text-xs px-2 py-1 rounded bg-black/80 text-white pointer-events-none">
             장소 불러오는 중…
           </div>
         )}
       </div>
-
+  
       {isDev && boundsText && (
         <div className="fixed bottom-2 right-2 rounded bg-black text-xs shadow px-2 py-1 pointer-events-none">
           {boundsText}
         </div>
       )}
+  
       <SheetProvider onclose={onCloseSheet}>
         <BottomSheet
           ref={sheetRef}

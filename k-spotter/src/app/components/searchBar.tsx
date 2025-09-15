@@ -1,52 +1,69 @@
-// SearchBar.tsx
+// app/components/searchBar.tsx
 "use client";
-import { useState } from "react";
-import { Search as SearchIcon } from "lucide-react";
 
-export default function SearchBar() {
-  const [value, setValue] = useState("");
-  const [open, setOpen] = useState(false);
+import { Search as SearchIcon } from "lucide-react";
+import { Dispatch, SetStateAction, useRef } from "react";
+
+type SearchProps = {
+  inputs: string;
+  setInputs: Dispatch<SetStateAction<string>>;
+  setMapCover: Dispatch<SetStateAction<"off" | "on">>;
+  mapCover: "off" | "on";
+};
+
+export default function SearchBar({
+  inputs,
+  setInputs,
+  setMapCover,
+  mapCover,
+}: SearchProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const onCancelToggle = () => {
+    setInputs("");
+    setMapCover("off");
+    inputRef.current?.blur(); // 모바일 키보드 닫기
+  };
 
   return (
-    // 맵 위 플로팅 레이어: 바깥은 이벤트 통과
-    <div className="pointer-events-none fixed left-1/2 top-[max(env(safe-area-inset-top),2rem)] -translate-x-1/2 z-30 w-[min(92%,720px)] px-2">
-      {/* 실제 바: 여기만 클릭 가능 */}
-      <div
-        className="pointer-events-auto rounded-2xl bg-white/80 backdrop-blur-md shadow-lg border border-white/60
-                   focus-within:ring-2 focus-within:ring-black/60"
-      >
-        <div className="flex items-center gap-2 px-3 h-14">
-          {/* 좌측 아이콘 자리 */}
-        
-          <SearchIcon
-            className="h-5 w-5 text-gray-500 transition-transform duration-150 group-focus-within:scale-105"
-            strokeWidth={2.75} // 1~2 사이로 굵기 조절
-            aria-hidden
-          />
-
-          {/* 입력 */}
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onFocus={() => setOpen(true)}
-            placeholder="장소, 키워드 검색"
-            className="flex-1 bg-transparent outline-none placeholder-gray-500 text-[15px] leading-none text-black"
-            aria-label="검색어 입력"
-          />
-
-          {/* 지우기 버튼 */}
-          {value && (
-            <button
-              type="button"
-              onClick={() => setValue("")}
-              className="shrink-0 h-8 w-8 grid place-items-center rounded-full hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-black/60"
-              aria-label="입력 지우기"
-            >
-              ✕
-            </button>
-          )}
-        </div>
+    // 🔸 포지셔닝/레이어는 부모에서! 여기선 일반 플렉스만
+    <div className="pointer-events-auto flex items-center gap-2 py-2 ">
+      <div className="relative flex-1">
+        {/* 아이콘: input 안쪽에 겹치기 */}
+        <SearchIcon
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500"
+          strokeWidth={2}
+          aria-hidden
+        />
+        <input
+          ref={inputRef}
+          id="q"
+          value={inputs}
+          onChange={(e) => setInputs(e.target.value)}
+          onFocus={() => setMapCover("on")}
+          placeholder="장소, 키워드 검색"
+          className="w-full h-12 sm:h-14 pl-10 pr-4 rounded-full
+                     bg-white/85 backdrop-blur-xl shadow-lg
+                     border border-white/60 ring-1 ring-black/5
+                     focus:outline-none focus:ring-2 focus:ring-black/60
+                     placeholder-gray-500 text-sm sm:text-base text-black
+                     transition"
+          aria-label="검색어 입력"
+        />
       </div>
+
+      {mapCover === "on" && (
+        <button
+          type="button"
+          onClick={onCancelToggle}
+          className="h-12 sm:h-14 px-4 rounded-full text-sm sm:text-base font-medium
+                     text-gray-800 bg-white/90 border border-black/10 shadow
+                     hover:bg-white active:scale-[.98]
+                     focus:outline-none focus-visible:ring-2 focus-visible:ring-black/60 transition"
+        >
+          취소
+        </button>
+      )}
     </div>
   );
 }
