@@ -9,13 +9,15 @@ type SearchProps = {
   setInputs: Dispatch<SetStateAction<string>>;
   setMapCover: Dispatch<SetStateAction<"off" | "on">>;
   mapCover: "off" | "on";
+  
 };
 
 export default function SearchBar({
   inputs,
   setInputs,
   setMapCover,
-  mapCover,
+  mapCover, 
+
 }: SearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
