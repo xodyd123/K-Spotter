@@ -10,7 +10,7 @@ export default function HomeComponent({value} : {value : Home}){
           alert("복사에 실패했어요.");
         }
       };
-   const {address , openHours , phone , closedday} = value ; 
+   const {address , openHours , phone , closedDay} = value ; 
 
    return (
     <section className="mt-2 rounded-2xl border bg-white/90 p-4 sm:p-5 ring-1 ring-black/5">
@@ -78,9 +78,9 @@ export default function HomeComponent({value} : {value : Home}){
           <div className="flex-1">
             <dt className="text-xs font-medium text-gray-500">휴무일</dt>
             <dd className="text-[15px] leading-6">
-              {closedday ? (
+              {closedDay ? (
                 <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-[12px] font-medium text-gray-700">
-                  {closedday}
+                  {closedDay}
                 </span>
               ) : (
                 <span className="text-gray-400">정보 없음</span>

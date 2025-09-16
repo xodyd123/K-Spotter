@@ -38,8 +38,8 @@ export function useSelectedLoader({ getSpotter, GetKeywordSearch, SearchImage, s
   
       const [s, k, i] = await Promise.allSettled([
         withTimeout(getSpotter({ lat: item.lat, lng: item.lng, radius: 1200,  contenTypeId: 12, signal: ac.signal })),
-        withTimeout(GetKeywordSearch({ keyword: item.placename, signal: ac.signal })),
-        withTimeout(SearchImage({ title: item.placename, signal: ac.signal })),
+        withTimeout(GetKeywordSearch({ keyword: item.placeName, signal: ac.signal })),
+        withTimeout(SearchImage({ title: item.placeName, signal: ac.signal })),
       ]);
 
       console.log(s , k , i); 

@@ -43,12 +43,14 @@ export default function MarkerDetail({
   const fav = isFavorite(item.id);
   const { cat, setCat, data, isFetching, prefetch } = useNearbyPlace(item);
 
+  
+
   const home = {
-    placename: item.placename,
-    openHours: item.openhours,
-    closedday: item.closedday,
+    placeName: item.placeName,
+    openHours: item.openHours,
+    closedDay: item.closedDay,
     phone: item.phone,
-    placetype: item.placetype,
+    placeType: item.placeType,
     address: item.address,
   };
 
@@ -129,7 +131,7 @@ export default function MarkerDetail({
   const onCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(
-        `${item.placename || item.title}\n${item.address}\n(${item.lat}, ${
+        `${item.placeName || item.title}\n${item.address}\n(${item.lat}, ${
           item.lng
         })`
       );
@@ -137,10 +139,10 @@ export default function MarkerDetail({
     } catch {
       alert("복사에 실패했어요.");
     }
-  }, [item.address, item.lat, item.lng, item.placename, item.title]);
+  }, [item.address, item.lat, item.lng, item.placeName, item.title]);
 
   const onShare = useCallback(async () => {
-    const text = `${item.placename || item.title} • ${item.address}`;
+    const text = `${item.placeName || item.title} • ${item.address}`;
     const url = `https://map.kakao.com/link/to/${encodeURIComponent(
       item.title
     )},${item.lat},${item.lng}`;
@@ -152,7 +154,7 @@ export default function MarkerDetail({
       await navigator.clipboard.writeText(url);
       alert("링크가 복사되었습니다.");
     }
-  }, [item.address, item.lat, item.lng, item.placename, item.title]);
+  }, [item.address, item.lat, item.lng, item.placeName, item.title]);
 
   const categoryPill = useMemo(() => {
     const tone: Record<string, string> = {
@@ -161,7 +163,7 @@ export default function MarkerDetail({
       MusicVideo: "bg-emerald-100 text-emerald-800 ring-emerald-200",
       Other: "bg-slate-100 text-slate-800 ring-slate-200",
     };
-    const base = tone[item.category] ?? tone.Other;
+    const base = tone[item.category?? "카테고리"] ?? tone.Other;
     return `inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold ring-1 ${base}`;
   }, [item.category]);
 
@@ -194,7 +196,7 @@ export default function MarkerDetail({
       <div className="px-5 py-5 sm:px-6 sm:py-6">
         <div className="mb-3 flex items-start gap-3">
           <h2 className="flex-1 truncate pr-2 text-2xl sm:text-3xl font-extrabold leading-tight tracking-tight text-gray-900">
-            {item.placename}
+            {item.placeName}
           </h2>
 
           <button
@@ -218,7 +220,7 @@ export default function MarkerDetail({
         </div>
 
         <p className="mt-2 text-[15px] leading-6 text-gray-700 line-clamp-2">
-          {item.placetype}
+          {item.placeType}
         </p>
 
         {/* 액션 */}
