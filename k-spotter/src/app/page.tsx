@@ -129,6 +129,7 @@ export default function Page() {
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const places: Place[] = await res.json(); 
 
+
     // 기존 클러스터 지우기 
     clustererRef.current.clear() ; 
     markersRef.current = [] ; 
@@ -297,7 +298,7 @@ export default function Page() {
 
   async function onMarkerClick(item: Place, marker: any) {
     // 1. 즉시 반응
-
+    
     setSelected(toPlaceM(item));
     setSheet("half");
     loadAndPatchSelected(item); // 비동기 로딩은 뒤에서 진행
@@ -452,13 +453,13 @@ export default function Page() {
           el.tagName === "TEXTAREA" ||
           el.isContentEditable);
       if (e.key === "Escape" && !typing) onCloseSheet();
-      if (e.key.toLowerCase() === "d") {
-        setIsDev((prev) => {
-          const next = !prev;
-          localStorage.setItem("devhud", next ? "1" : "0");
-          return next;
-        });
-      }
+      // if (e.key.toLowerCase() === "d") {
+      //   setIsDev((prev) => {
+      //     const next = !prev;
+      //     localStorage.setItem("devhud", next ? "1" : "0");
+      //     return next;
+      //   });
+      // }
     };
 
     window.addEventListener("keydown", onKey);
