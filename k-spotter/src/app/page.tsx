@@ -195,8 +195,7 @@ export default function Page() {
       await sheetRef.current?.close("closed");
 
       // 마커 업데이트
-      setSelected(toPlaceM(n));
-
+      setBottomView(prev => prev.kind === "detailPlace" ? {...prev , item : toPlaceM(n)} : prev  )
       // 선택 마커 생성 및 /이동
       ensureSelectedMarker(n.lat, n.lng);
 
