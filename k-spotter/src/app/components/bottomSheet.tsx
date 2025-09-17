@@ -1,18 +1,15 @@
 "use client";
 import React, {
   forwardRef,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+
   useImperativeHandle,
-  Children,
+ 
 } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { NearbyPlace, Place, PlaceM } from "../../../type/type";
+import type {  NearbyPlace, PlaceM, SheetView } from "../../../type/type";
 import MarkerDetail from "./markerDetail";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
+import SearchBottomLayout from "./searchBottomLayout";
 
 export type SheetState = "closed" | "peek" | "half" | "full";
 
@@ -25,18 +22,22 @@ export type SheetHandle = {
 
 // children 허용
 type BottomSheetProps = React.PropsWithChildren<{
-  selected: PlaceM | null;
+
   sheet: SheetState;
   setSheet: Dispatch<SetStateAction<SheetState>>;
   yOverride?: string | null; // 외부 보정(px 문자열) - 선택
-  onSelectNearby: (n: NearbyPlace) => Promise<void>;
+  onSelectNearby: (n: NearbyPlace) => Promise<void>; 
+  bottomView : SheetView;
 }>;
+
+
 
 const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
   function BottomSheet(
-    { selected, sheet, setSheet, yOverride, onSelectNearby }: BottomSheetProps,
+    { sheet, setSheet, yOverride, onSelectNearby  , bottomView}: BottomSheetProps,
     ref
   ) {
+    
     const {
       isOpen,
       rootRef,
@@ -47,6 +48,18 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
       close,
       getHeight,
     } = useBottomSheet({ sheet, setSheet, yOverride });
+
+    function SheetBody({ bottomView }: { bottomView: SheetView }) {
+      switch (bottomView.kind) {
+        case 'summaryPlaces':
+          return <SearchBottomLayout items={bottomView.items}/>
+        case 'detailPlace':
+          return <MarkerDetail item ={bottomView.item} onSelectNearby={onSelectNearby} sheet={sheet} setSheet={setSheet} />  
+        case 'closed':
+          return null;
+
+      }
+    }
 
     useImperativeHandle(
       ref,
@@ -89,9 +102,7 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
   
           {/* Content */}
           <div className="h-[calc(100%-40px)] overflow-y-auto [overflow-anchor:none]">
-            {selected && (
-              <MarkerDetail item={selected} onSelectNearby={onSelectNearby} sheet={sheet} setSheet={setSheet} />
-            )}
+            {SheetBody({bottomView})}
           </div>
         </div>
       </>
