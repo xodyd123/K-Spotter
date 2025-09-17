@@ -25,12 +25,12 @@ const CATS: { id: CatId; label: string; ctype: number | null }[] = [
 ];
 
 export default function MarkerDetail({
-  item,
+  item ,
   onSelectNearby,
   sheet ,  
   setSheet , 
 }: {
-  item: PlaceM;
+  item : PlaceM , 
   onSelectNearby: (n: NearbyPlace) => void;
   sheet: SheetState; 
   setSheet : Dispatch<SetStateAction<SheetState>>
@@ -318,7 +318,7 @@ export default function MarkerDetail({
                 return (
                   <button
                     key={c.id}
-                    onFocus={() => onCategoryToggle(c.id)} // 현재 적용 안됨
+                    onFocus={() => onCategoryToggle(c.id)} 
                     onTouchStart={() => onCategoryToggle(c.id)}
                     onClick={() => setCat(c.id)}
                     aria-pressed={active}

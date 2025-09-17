@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BBox,
+  BottomState,
   ca,
   LatLng,
   NearbyPlace,
@@ -11,6 +12,8 @@ import {
   Place,
   PlaceM,
   SearchItem,
+  SearchResultItem,
+  SheetView,
   toPlaceM,
 } from "../../type/type";
 import SearchBar from "./components/searchBar";
@@ -39,9 +42,9 @@ declare global {
   }
 }
 
+
 export default function Page() {
   const mapRef = useRef<HTMLDivElement>(null);
-
   //  중복 초기화/정리 핸들 보관
   const initializedRef = useRef(false);
   const cleanupRef = useRef<() => void>(() => {});
@@ -89,23 +92,23 @@ export default function Page() {
 
   type SheetState = "closed" | "peek" | "half" | "full";
   const [sheet, setSheet] = useState<SheetState>("closed");
-  const [selected, setSelected] = useState<PlaceM | null>(null);
   const [sheetYOverride, setSheetYOverride] = useState<string | null>(null);
   const [inputs, setInputs] = useState("");
   const [mapCover, setMapCover] = useState<"off" | "on">("off");
   const [searchKeyWord, setSearch] = useState<SearchItem[]>([]);
+  const [bottomView , setBottomView] = useState<SheetView>({ kind: "closed" }) ; 
 
   const { loadAndPatchSelected, cancel } = useSelectedLoader({
     getSpotter,
     GetKeywordSearch,
     SearchImage,
-    setSelected,
+    setBottomView,
   });
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
 
-  const [autoQuery, setAutoQuery] = useState(false); // 처음엔 마커 안 그림
+  const [autoQuery, setAutoQuery] = useState(false); // 처음엔 마커 안 그림 
 
   const reqSeq = useRef(0);
   const clickRef = useRef(false);
@@ -115,12 +118,29 @@ export default function Page() {
 
   // 러스터/이벤트 처리에서 마커만 받았을 때도 곧바로 원본 장소 정보에 접근하려고 만든, 깔끔하고 메모리 안전한 역참조 저장소
   const markerToPlace = useRef<WeakMap<any, Place>>(new WeakMap());
+
+  const openSummary = (items: Place[]) => {
+    setSheet("half");
+    setBottomView({kind : "summaryPlaces" , items })
+  } 
+
+  const openDetail = (item : PlaceM) => {
+    setBottomView({ kind: 'detailPlace', item });
+    setSheet('half');
+  }
+
+  const closeAll = () => {
+    setSheet('closed');
+    setBottomView({ kind: 'closed' });
+  }
   
   const onPickKeyWord = async(itemName : string) => {
     if (!map.current || !clustererRef.current) return; 
 
     setMapCover("off") ; 
-    //setSheet("peek"); 
+    
+
+    // 검색했다는 상태 등록 
     setShowSpinner(true) ; 
 
     try{
@@ -129,7 +149,7 @@ export default function Page() {
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const places: Place[] = await res.json(); 
 
-
+    openSummary(places) ; 
     // 기존 클러스터 지우기 
     clustererRef.current.clear() ; 
     markersRef.current = [] ; 
@@ -298,9 +318,11 @@ export default function Page() {
 
   async function onMarkerClick(item: Place, marker: any) {
     // 1. 즉시 반응
-    
-    setSelected(toPlaceM(item));
+    openDetail(toPlaceM(item)) ;
+    setBottomView({kind : "detailPlace" , item : toPlaceM(item)})
+
     setSheet("half");
+    
     loadAndPatchSelected(item); // 비동기 로딩은 뒤에서 진행
     //2. 비동기로 이미지 추천
 
@@ -413,8 +435,8 @@ export default function Page() {
   }
 
   const onCloseSheet = () => {
-    setSheet("closed");
-    setSelected(null);
+
+    closeAll() ;
     setSheetYOverride(null);
     // clearRadiusRing();
     // clearNearbyMarkers();
@@ -563,7 +585,6 @@ export default function Page() {
         const offHandlers: Array<() => void> = [];
 
         const onIdle = () => {
-        
           boxRef.current = readMapBBox(map.current);
 
           if (programmaticMoveCntRef.current > 0) {
@@ -599,12 +620,15 @@ export default function Page() {
 
         const onZoomChanged = () => {
           // 우리가 움직이는 중이 아니면 사용자 줌으로 간주
-          if (programmaticMoveCntRef.current === 0) {
-            userInteractedRef.current = true;
-          }
+            // 프로그램이 방금 지도 이동/줌을 일으킨 경우 → 시트 닫지 않음
+        if (programmaticMoveCntRef.current > 0) {
+        programmaticMoveCntRef.current = Math.max(0, programmaticMoveCntRef.current - 1);
+         return;
+        }
 
-          onCloseSheet();
-        };
+        userInteractedRef.current = true;
+        onCloseSheet();
+      }
 
         const onMapCanvasClick = () => {
           userInteractedRef.current = true;
@@ -748,9 +772,10 @@ export default function Page() {
       )}
 
       <SheetProvider onclose={onCloseSheet}>
-        <BottomSheet
+         <BottomSheet 
+          bottomView = {bottomView}
           ref={sheetRef}
-          selected={selected}
+        
           sheet={sheet}
           setSheet={setSheet}
           yOverride={sheetYOverride}
