@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BBox,
-  BottomState,
   ca,
   LatLng,
   NearbyPlace,
@@ -12,13 +11,11 @@ import {
   Place,
   PlaceM,
   SearchItem,
-  SearchResultItem,
   SheetView,
   toPlaceM,
 } from "../../type/type";
 import SearchBar from "./components/searchBar";
-import CategoryRow from "./components/categoryRow";
-import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
+
 import BottomSheet, { SheetHandle } from "./components/bottomSheet";
 import {
   getViewportHeight,
@@ -33,7 +30,6 @@ import { SearchImage } from "@/lib/mock/galley/searchImage";
 
 import { useSelectedLoader } from "../hooks/fetchImage";
 import { waitMapIdle } from "@/utils/waitMapIdle";
-import { useSearchParams } from "next/navigation";
 import SearchContent from "./components/searchContent";
 
 declare global {
@@ -135,6 +131,7 @@ export default function Page() {
   }
   
   const onPickKeyWord = async(itemName : string) => {
+    
     if (!map.current || !clustererRef.current) return; 
 
     setMapCover("off") ; 
@@ -148,6 +145,8 @@ export default function Page() {
     const res = await fetch(`/api/searchPlaces?name=${encodeURIComponent(itemName)}&mode=points`);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const places: Place[] = await res.json(); 
+
+    
 
     openSummary(places) ; 
     // 기존 클러스터 지우기 

@@ -3,15 +3,13 @@ import React, {
   forwardRef,
 
   useImperativeHandle,
-
+ 
 } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type {  NearbyPlace, PlaceM, SheetView } from "../../../type/type";
 import MarkerDetail from "./markerDetail";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
 import SearchBottomLayout from "./searchBottomLayout";
-Sheet } from "@/hooks/useBottomSheet";
-
 
 export type SheetState = "closed" | "peek" | "half" | "full";
 
@@ -24,7 +22,6 @@ export type SheetHandle = {
 
 // children 허용
 type BottomSheetProps = React.PropsWithChildren<{
-
 
   sheet: SheetState;
   setSheet: Dispatch<SetStateAction<SheetState>>;
@@ -41,7 +38,6 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
     ref
   ) {
     
-
     const {
       isOpen,
       rootRef,
@@ -53,11 +49,10 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
       getHeight,
     } = useBottomSheet({ sheet, setSheet, yOverride });
 
-
     function SheetBody({ bottomView }: { bottomView: SheetView }) {
       switch (bottomView.kind) {
         case 'summaryPlaces':
-          return <SearchBottomLayout/>
+          return <SearchBottomLayout items={bottomView.items}/>
         case 'detailPlace':
           return <MarkerDetail item ={bottomView.item} onSelectNearby={onSelectNearby} sheet={sheet} setSheet={setSheet} />  
         case 'closed':
@@ -65,7 +60,6 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
 
       }
     }
-
 
     useImperativeHandle(
       ref,
@@ -109,7 +103,6 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
           {/* Content */}
           <div className="h-[calc(100%-40px)] overflow-y-auto [overflow-anchor:none]">
             {SheetBody({bottomView})}
-
           </div>
         </div>
       </>
