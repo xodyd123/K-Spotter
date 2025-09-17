@@ -147,7 +147,6 @@ export default function Page() {
     const places: Place[] = await res.json(); 
 
     
-
     openSummary(places) ; 
     // 기존 클러스터 지우기 
     clustererRef.current.clear() ; 
@@ -500,6 +499,7 @@ export default function Page() {
           return res.json();
         })
         .then((data: SearchItem[]) => {
+          console.log("data" , data) ; 
           setSearch([...data]);
         })
         .catch((e) => console.error(e));
@@ -773,7 +773,6 @@ export default function Page() {
          <BottomSheet 
           bottomView = {bottomView}
           ref={sheetRef}
-        
           sheet={sheet}
           setSheet={setSheet}
           yOverride={sheetYOverride}
