@@ -1,9 +1,7 @@
 // app/components/nearbyComponent.tsx
 "use client";
 import NearbyDetail from "../../app/components/nearbyDetail"
-import type { NearbyPlace } from "../../../type/type";
-import { SetStateAction, useEffect } from "react";
-import { SheetState } from "./bottomSheet";
+import type { NearbyPlace, selected } from "../../../type/type";
 
 
 function formatDist(d?: number | null) {
@@ -14,7 +12,7 @@ function formatDist(d?: number | null) {
 }
 
 
-export default function NearbyComponent({ value ,  onSelectNearby}: { value: NearbyPlace[] ; onSelectNearby :  (n: NearbyPlace) => void }) { 
+export default function NearbyComponent({ value ,  onSelectNearby}: { value: NearbyPlace[] ; onSelectNearby :  (s : selected) => void }) { 
 
  
   if (!value?.length) {

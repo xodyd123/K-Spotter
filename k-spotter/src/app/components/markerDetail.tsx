@@ -3,7 +3,7 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useFavorites } from "@/hooks/useLocalStorage";
-import { DetailPlace, NearbyPlace, PlaceM } from "../../../type/type";
+import { DetailPlace, NearbyPlace, PlaceM, selected } from "../../../type/type";
 import HomeComponent from "./homeContnet";
 import NearbyComponent from "./nearbyComponent";
 import { useNearbyPlace } from "@/hooks/useNearbyPlaces";
@@ -31,7 +31,7 @@ export default function MarkerDetail({
   setSheet , 
 }: {
   item : PlaceM , 
-  onSelectNearby: (n: NearbyPlace) => void;
+  onSelectNearby: (s : selected) => void;
   sheet: SheetState; 
   setSheet : Dispatch<SetStateAction<SheetState>>
 }) {
@@ -41,7 +41,7 @@ export default function MarkerDetail({
 
   const { toggle, isFavorite } = useFavorites();
   const fav = isFavorite(item.id);
-  const { cat, setCat, data, isFetching, prefetch } = useNearbyPlace(item);
+  const { cat, setCat, data, prefetch } = useNearbyPlace(item);
 
   
 

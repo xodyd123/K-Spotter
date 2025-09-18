@@ -9,7 +9,7 @@ type SearchProps = {
   setInputs: Dispatch<SetStateAction<string>>;
   setMapCover: Dispatch<SetStateAction<"off" | "on">>;
   mapCover: "off" | "on";
-  
+  closeAll : () => void   
 };
 
 export default function SearchBar({
@@ -17,6 +17,7 @@ export default function SearchBar({
   setInputs,
   setMapCover,
   mapCover, 
+  closeAll
 
 }: SearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,6 +27,11 @@ export default function SearchBar({
     setMapCover("off");
     inputRef.current?.blur(); // 모바일 키보드 닫기
   };
+
+  const onClose = () => {
+    setMapCover("on") 
+    closeAll() ; 
+  }
 
   return (
     // 🔸 포지셔닝/레이어는 부모에서! 여기선 일반 플렉스만
@@ -42,7 +48,7 @@ export default function SearchBar({
           id="q"
           value={inputs}
           onChange={(e) => setInputs(e.target.value)}
-          onFocus={() => setMapCover("on")}
+          onFocus={onClose}
           placeholder="장소, 키워드 검색"
           className="w-full h-12 sm:h-14 pl-10 pr-4 rounded-full
                      bg-white/85 backdrop-blur-xl shadow-lg

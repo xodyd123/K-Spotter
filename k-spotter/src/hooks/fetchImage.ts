@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useRef } from "react";
-import {  Place,  SheetView } from "../../type/type";
+import {  Place,  SheetView, toPlaceM } from "../../type/type";
 
 type PhotoItem = {
   galWebImageUrl?: string; // 실제 타입에 맞게 보강
@@ -49,7 +49,8 @@ export function useSelectedLoader({ getSpotter, GetKeywordSearch, SearchImage,  
   
       const imgs: PhotoItem[] = i.status === "fulfilled" ? (i.value ?? []) : [];
       const thumb = imgs[0]?.galWebImageUrl ?? null;
-      setBottomView(prev => (prev.kind =="detailPlace" && prev.item.id === item.id ? { ...prev, item : {...prev.item , thumb}  } : prev));
+      setBottomView(prev => (prev.kind =="summaryPlaces" ? {kind : "detailPlace" , item : toPlaceM({...item , thumb}) } : 
+      prev.kind == "detailPlace" ? {...prev , item : {...prev.item , thumb}}  : {kind : "closed"}));
     }, [getSpotter, GetKeywordSearch, SearchImage, setBottomView, withTimeout]);
   
     const cancel = useCallback(() => abortRef.current?.abort(), []);
