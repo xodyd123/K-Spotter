@@ -191,22 +191,29 @@ export default function Page() {
   };
 
   // 1) 클릭 시 포커싱 + 고정 확대
-const focusZoomTo = async (pos: kakao.maps.LatLng) => {
-  if (!map.current) return;
-  const m = map.current;
+  const focusZoomTo = async (pos: kakao.maps.LatLng, targetLevel = 3) => {
+    if (!map.current) return;
+    const m = map.current;
+    let cur = m.getLevel();
+    const target = Math.max(1, targetLevel);
 
-  // (선택) 먼저 중심을 pos로 맞춰두면 줌 동안 '정중앙'에 고정됨
-  programmaticMoveCntRef.current += 1;
-  m.setCenter(pos);
-  await waitMapIdle(m);
-
-  // 클러스터러 minLevel=10이면 9로까지는 내려줘야 개별 마커가 보입니다.
-  const target = m.getLevel() > 9 ? 9 : Math.max(1, m.getLevel() - 2);
-
-  programmaticMoveCntRef.current += 1;
-  m.setLevel(target, { anchor: pos, animate: { duration: 400 } }); // ★ 고정 앵커
-  await waitMapIdle(m);
-};
+    // (선택) 먼저 중심을 pos로 맞춰두면 줌 동안 '정중앙'에 고정됨
+    programmaticMoveCntRef.current += 1;
+    m.panTo(pos);
+    await waitMapIdle(m); // ← 부드럽게 중앙으로
+    while (cur - targetLevel > 1) {
+      // 2단계씩
+      cur -= 2;
+      programmaticMoveCntRef.current += 1;
+      m.setLevel(cur, { anchor: pos, animate: { duration: 220 } });
+      await waitMapIdle(m);
+    }
+    if (cur !== targetLevel) {
+      programmaticMoveCntRef.current += 1;
+      m.setLevel(targetLevel, { anchor: pos, animate: { duration: 220 } });
+      await waitMapIdle(m);
+    }
+  };
 
   const onSelectNearby = useCallback(async (s: selected) => {
     if (clickRef.current) return;
@@ -221,7 +228,6 @@ const focusZoomTo = async (pos: kakao.maps.LatLng) => {
       if (s.kind === "place") {
         openDetail(toPlaceM(s.data));
         loadAndPatchSelected(s.data); // 지금 이미지를 불러올때 상태를 변화 시키고 있음
-        // setBottomView({ kind: 'detailPlace', item: toPlaceM(s.data) });
       } else {
         setBottomView({ kind: "detailPlace", item: toPlaceM(s.data) });
       }
@@ -241,18 +247,24 @@ const focusZoomTo = async (pos: kakao.maps.LatLng) => {
       // 오프셋 패닝
 
       await focusZoomTo(pos);
+      const decision = decideSheetOrPan(map.current, pos, "half");
+      
+      const vh = getViewportHeight(map.current);
+      const visiblePx = desiredVisiblePx(vh, "half");
 
-       const vh = getViewportHeight(map.current);
-       const visiblePx = desiredVisiblePx(vh, 'half');
-      const decision = decideSheetOrPan(map.current, pos , 'half');
-       if (decision.panBy && decision.panBy > 0) programmaticMoveCntRef.current += 1;
+      if (decision.panBy && decision.panBy > 0)
+        programmaticMoveCntRef.current += 1;
       setSheetYOverride(decision.yOverride ?? null);
 
-      ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, { gap: 12, factor: 0.6, maxPan: 120, eps: 2 });
+      ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
+        gap: 12,
+        factor: 0.6,
+        maxPan: 120,
+        eps: 2,
+      });
 
       programmaticMoveCntRef.current += 1;
       await waitMapIdle(map.current);
-
 
       // (D) 시트 다시 열림 애니 끝까지 대기
       await sheetRef.current?.open("half");
@@ -355,7 +367,6 @@ const focusZoomTo = async (pos: kakao.maps.LatLng) => {
   //   nearbyAbortRef.current?.abort();
   //   nearbyAbortRef.current = null;
   // }
-
 
   async function fetchPlacesForBBox(bbox: BBox) {
     const id = ++reqSeq.current;
@@ -517,7 +528,7 @@ const focusZoomTo = async (pos: kakao.maps.LatLng) => {
     const cur = boxRef.current ?? readMapBBox(map.current);
     if (!cur) return;
     fetchPlacesForBBox(cur);
-  }, [ userCategory, autoQuery]);
+  }, [userCategory, autoQuery]);
 
   useEffect(() => {
     if (!mapRef.current) return;
