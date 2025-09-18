@@ -6,7 +6,7 @@ import React, {
  
 } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type {  NearbyPlace, PlaceM, SheetView } from "../../../type/type";
+import type {  NearbyPlace, Place, PlaceM, selected, SheetView } from "../../../type/type";
 import MarkerDetail from "./markerDetail";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
 import SearchBottomLayout from "./searchBottomLayout";
@@ -26,15 +26,17 @@ type BottomSheetProps = React.PropsWithChildren<{
   sheet: SheetState;
   setSheet: Dispatch<SetStateAction<SheetState>>;
   yOverride?: string | null; // 외부 보정(px 문자열) - 선택
-  onSelectNearby: (n: NearbyPlace) => Promise<void>; 
-  bottomView : SheetView;
+  onSelectNearby: (s: selected) => Promise<void>; 
+  bottomView : SheetView; 
+  openDetail : (items : PlaceM) => void ; 
+  closeAll  : () => void 
 }>;
 
 
 
 const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
   function BottomSheet(
-    { sheet, setSheet, yOverride, onSelectNearby  , bottomView}: BottomSheetProps,
+    { sheet, setSheet, yOverride, onSelectNearby  , bottomView , openDetail ,closeAll}: BottomSheetProps,
     ref
   ) {
     
@@ -52,7 +54,7 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
     function SheetBody({ bottomView }: { bottomView: SheetView }) {
       switch (bottomView.kind) {
         case 'summaryPlaces':
-          return <SearchBottomLayout items={bottomView.items}/>
+          return <SearchBottomLayout items={bottomView.items} onSelectNearby={onSelectNearby}/>
         case 'detailPlace':
           return <MarkerDetail item ={bottomView.item} onSelectNearby={onSelectNearby} sheet={sheet} setSheet={setSheet} />  
         case 'closed':
@@ -61,10 +63,11 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
       }
     }
 
+
     useImperativeHandle(
       ref,
       () => ({
-        open , close , getHeight
+        open , close , getHeight  
       }),
       [open , close , getHeight]
     );

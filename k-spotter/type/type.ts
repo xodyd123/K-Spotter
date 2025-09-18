@@ -143,7 +143,9 @@ export type SheetView =
 | { kind: 'summaryPlaces'; items: Place[] }
 | { kind: 'detailPlace';  item: PlaceM }
 | { kind : "closed"}
+ 
 
+export type selected = {kind : "place" ; data : Place } | {kind : "nearby" ; data : NearbyPlace} ; 
 
 
 
