@@ -1,4 +1,4 @@
-// 카카오 타입이 없다면 any로 두세요. (아래 declare global 참고)
+
 export function waitMapIdle(map: any, timeout = 800): Promise<void> {
     return new Promise<void>((resolve) => {
       // SSR/지도 미초기화 안전 처리
