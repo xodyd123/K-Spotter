@@ -6,16 +6,16 @@ import {
   BBox,
   ca,
   LatLng,
-  NearbyPlace,
   Pins,
   Place,
   PlaceM,
   SearchItem,
+  selected,
+  SheetView,
   toPlaceM,
 } from "../../type/type";
 import SearchBar from "./components/searchBar";
-import CategoryRow from "./components/categoryRow";
-import { getNearbyPlaces } from "@/lib/mock/apitour/getNearbyPlaces";
+
 import BottomSheet, { SheetHandle } from "./components/bottomSheet";
 import {
   getViewportHeight,
@@ -30,7 +30,6 @@ import { SearchImage } from "@/lib/mock/galley/searchImage";
 
 import { useSelectedLoader } from "../hooks/fetchImage";
 import { waitMapIdle } from "@/utils/waitMapIdle";
-import { useSearchParams } from "next/navigation";
 import SearchContent from "./components/searchContent";
 
 declare global {
@@ -39,9 +38,11 @@ declare global {
   }
 }
 
+
+
+
 export default function Page() {
   const mapRef = useRef<HTMLDivElement>(null);
-
   //  중복 초기화/정리 핸들 보관
   const initializedRef = useRef(false);
   const cleanupRef = useRef<() => void>(() => {});
@@ -89,23 +90,23 @@ export default function Page() {
 
   type SheetState = "closed" | "peek" | "half" | "full";
   const [sheet, setSheet] = useState<SheetState>("closed");
-  const [selected, setSelected] = useState<PlaceM | null>(null);
   const [sheetYOverride, setSheetYOverride] = useState<string | null>(null);
   const [inputs, setInputs] = useState("");
   const [mapCover, setMapCover] = useState<"off" | "on">("off");
   const [searchKeyWord, setSearch] = useState<SearchItem[]>([]);
+  const [bottomView , setBottomView] = useState<SheetView>({ kind: "closed" }) ; 
 
   const { loadAndPatchSelected, cancel } = useSelectedLoader({
     getSpotter,
     GetKeywordSearch,
     SearchImage,
-    setSelected,
+    setBottomView,
   });
 
   // 유틸: 현재 작업이 끝난 다음 마이크로태스크로 미루기
   const defer = (fn: () => void) => queueMicrotask(fn);
 
-  const [autoQuery, setAutoQuery] = useState(false); // 처음엔 마커 안 그림
+  const [autoQuery, setAutoQuery] = useState(false); // 처음엔 마커 안 그림 
 
   const reqSeq = useRef(0);
   const clickRef = useRef(false);
@@ -114,13 +115,32 @@ export default function Page() {
   const clustererRef = useRef<any | null>(null);
 
   // 러스터/이벤트 처리에서 마커만 받았을 때도 곧바로 원본 장소 정보에 접근하려고 만든, 깔끔하고 메모리 안전한 역참조 저장소
-  const markerToPlace = useRef<WeakMap<any, Place>>(new WeakMap());
+  const markerToPlace = useRef<WeakMap<any, Place>>(new WeakMap()); 
+  const placeIdToMarkerRef = useRef<Map<number|string ,  kakao.maps.Marker>>(new Map()); 
+
+  const openSummary = (items: Place[]) => {
+    setSheet("half");
+    setBottomView({kind : "summaryPlaces" , items })
+  } 
+
+  const openDetail = (item : PlaceM) => {
+    setBottomView({ kind: 'detailPlace', item });
+    //setSheet('half');
+  }
+
+  const closeAll = () => {
+    setSheet('closed');
+    setBottomView({ kind: 'closed' });
+  }
   
   const onPickKeyWord = async(itemName : string) => {
+    
     if (!map.current || !clustererRef.current) return; 
 
     setMapCover("off") ; 
-    //setSheet("peek"); 
+    
+
+    // 검색했다는 상태 등록 
     setShowSpinner(true) ; 
 
     try{
@@ -129,10 +149,12 @@ export default function Page() {
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const places: Place[] = await res.json(); 
 
-
+    
+    openSummary(places) ; 
     // 기존 클러스터 지우기 
     clustererRef.current.clear() ; 
-    markersRef.current = [] ; 
+    markersRef.current = [];
+    placeIdToMarkerRef.current.clear();
 
     const { kakao } = window as any;
     const markers: any[] = [];
@@ -144,10 +166,13 @@ export default function Page() {
         image: pinRef.current?.[p.category as ca],
         title: p.title,
       });
-      kakao.maps.event.addListener(marker, "click", () => onMarkerClick(p, marker));
+      kakao.maps.event.addListener(marker, "click", () => onSelectNearby({kind : "place" , data : p}));
       markers.push(marker);
       bounds.extend(marker.getPosition());
+      
       markerToPlace.current.set(marker, p);
+      // 양방향 저장 
+      placeIdToMarkerRef.current.set(p.id , marker) ; 
     }
 
     // 클러스터에 등록 
@@ -168,47 +193,66 @@ export default function Page() {
     
   }
 
-  const onSelectNearby = useCallback(async (n: NearbyPlace) => {
+  const onSelectNearby = useCallback(async (s: selected) => {
+     
     if (clickRef.current) return;
     clickRef.current = true;
     try {
-      await sheetRef.current?.close("closed");
+       await sheetRef.current?.close("closed");
+       
+//   const t0 = performance.now();
+// await (sheetRef.current?.close('closed') ?? Promise.resolve());
+// console.log('closed after', performance.now() - t0, 'ms'); // 대략 트랜지션 시간만큼 걸림 
+       
+     if (s.kind === "place") {
+      openDetail(toPlaceM(s.data)) ; 
+      loadAndPatchSelected(s.data); // 지금 이미지를 불러올때 상태를 변화 시키고 있음 
+     // setBottomView({ kind: 'detailPlace', item: toPlaceM(s.data) });
+     } 
 
-      // 마커 업데이트
-      setSelected(toPlaceM(n));
+     else {
+      setBottomView({ kind: 'detailPlace', item: toPlaceM(s.data) }) 
+     
+     }
 
+     // 이미 생성된 마커를 ㅏㅈ아서 사용 
+     const marker = placeIdToMarkerRef.current.get(s.data.id) ; 
+
+     console.log("marker" , marker); 
+
+     const pos =  marker ? marker.getPosition() : new kakao.maps.LatLng(s.data.lat, s.data.lng);
+
+
+
+    // 클러스터 때문에 안 보일 수 있으면 살짝 줌 인 (minLevel보다 작게)
+    if (map.current.getLevel() > 9) {  // minLevel이 10이라면 9로
+      programmaticMoveCntRef.current += 1;
+      map.current.setLevel(9);
+      await waitMapIdle(map.current);
+    }
+      
+     
       // 선택 마커 생성 및 /이동
-      ensureSelectedMarker(n.lat, n.lng);
-
+      ensureSelectedMarker(s.data.lat, s.data.lng); 
       // 지도 이동 + idle 대기
-      const pos = new kakao.maps.LatLng(n.lat, n.lng);
-      const vh = getViewportHeight(map.current);
-      const visiblePx = desiredVisiblePx(vh, "half");
 
-      // 하이브리드 결정
-      const decision = decideSheetOrPan(map.current, pos, "half");
+      // 오프셋 패닝
+    const vh = getViewportHeight(map.current);
+    const visiblePx = desiredVisiblePx(vh, 'half');
+    const decision = decideSheetOrPan(map.current, pos, 'half');
+    if (decision.panBy && decision.panBy > 0) programmaticMoveCntRef.current += 1;
+    setSheetYOverride(decision.yOverride ?? null);
 
-      // 3) 패닝 적용(있으면) — 둘 중 택1
-      if (decision.panBy && decision.panBy > 0) {
-        programmaticMoveCntRef.current += 1;
-      }
+    programmaticMoveCntRef.current += 1;
+    ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, { gap: 12, factor: 0.6, maxPan: 120, eps: 2 });
+    await waitMapIdle(map.current);
 
-      if (decision.yOverride) {
-        setSheetYOverride(decision.yOverride); // BottomSheet에 yOverride props로 전달
-      } else {
-        setSheetYOverride(null);
-      }
+    // 콘텐츠 설정만
+    openDetail(toPlaceM(s.data));
 
-      programmaticMoveCntRef.current += 1; // 자동 이동 플래그
+  
 
-      ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
-        gap: 12,
-        factor: 0.6,
-        maxPan: 120,
-        eps: 2,
-      });
-      await waitMapIdle(map.current); // idle 이벤트 대기
-
+ 
       // (D) 시트 다시 열림 애니 끝까지 대기
       await sheetRef.current?.open("half");
     } finally {
@@ -226,9 +270,10 @@ export default function Page() {
       selectedMarkerRef.current = new kakao.maps.Marker({
         position: pos,
         map: map.current,
-        // image: pinRef.current?.selected, // 선택용 아이콘
+      
         zIndex: 3,
       });
+    
     } else {
       selectedMarkerRef.current.setPosition(pos);
       selectedMarkerRef.current.setMap(map.current);
@@ -296,44 +341,6 @@ export default function Page() {
     nearbyAbortRef.current = null;
   }
 
-  async function onMarkerClick(item: Place, marker: any) {
-    // 1. 즉시 반응
-    
-    setSelected(toPlaceM(item));
-    setSheet("half");
-    loadAndPatchSelected(item); // 비동기 로딩은 뒤에서 진행
-    //2. 비동기로 이미지 추천
-
-    const pos = marker.getPosition();
-    // 시트가 현재 보이는 높이(px)
-    const vh = getViewportHeight(map.current);
-    const visiblePx = desiredVisiblePx(vh, "half");
-
-    // 하이브리드 결정
-    const decision = decideSheetOrPan(map.current, pos, "half");
-
-    // 3) 패닝 적용(있으면) — 둘 중 택1
-    if (decision.panBy && decision.panBy > 0) {
-      programmaticMoveCntRef.current += 1;
-    }
-
-    if (decision.yOverride) {
-      setSheetYOverride(decision.yOverride); // BottomSheet에 yOverride props로 전달
-    } else {
-      setSheetYOverride(null);
-    }
-
-    programmaticMoveCntRef.current += 1; // 자동 이동 플래그
-
-    // 부드럽게 이동(추천)
-    ensureMarkerAboveSheetSoft(map.current, pos, visiblePx, {
-      gap: 12,
-      factor: 0.6,
-      maxPan: 120,
-      eps: 2,
-    });
-  }
-
   async function fetchPlacesForBBox(bbox: BBox) {
     const id = ++reqSeq.current;
 
@@ -384,7 +391,7 @@ export default function Page() {
           image: img,
         });
         const handler = async () => {
-          onMarkerClick(item, marker);
+          onSelectNearby({kind:"place" , data : item })
         };
         kakao.maps.event.addListener(marker, "click", handler);
         markerToPlace.current.set(marker, item); // 역참조 저장
@@ -413,8 +420,8 @@ export default function Page() {
   }
 
   const onCloseSheet = () => {
-    setSheet("closed");
-    setSelected(null);
+
+    closeAll() ;
     setSheetYOverride(null);
     // clearRadiusRing();
     // clearNearbyMarkers();
@@ -480,6 +487,7 @@ export default function Page() {
           return res.json();
         })
         .then((data: SearchItem[]) => {
+          
           setSearch([...data]);
         })
         .catch((e) => console.error(e));
@@ -563,7 +571,6 @@ export default function Page() {
         const offHandlers: Array<() => void> = [];
 
         const onIdle = () => {
-        
           boxRef.current = readMapBBox(map.current);
 
           if (programmaticMoveCntRef.current > 0) {
@@ -599,12 +606,15 @@ export default function Page() {
 
         const onZoomChanged = () => {
           // 우리가 움직이는 중이 아니면 사용자 줌으로 간주
-          if (programmaticMoveCntRef.current === 0) {
-            userInteractedRef.current = true;
-          }
+            // 프로그램이 방금 지도 이동/줌을 일으킨 경우 → 시트 닫지 않음
+        if (programmaticMoveCntRef.current > 0) {
+        programmaticMoveCntRef.current = Math.max(0, programmaticMoveCntRef.current - 1);
+         return;
+        }
 
-          onCloseSheet();
-        };
+        userInteractedRef.current = true;
+        onCloseSheet();
+      }
 
         const onMapCanvasClick = () => {
           userInteractedRef.current = true;
@@ -696,7 +706,8 @@ export default function Page() {
           <SearchBar
             inputs={inputs}
             setInputs={setInputs}
-            setMapCover={setMapCover}
+            setMapCover={setMapCover}  
+            closeAll = {closeAll}
             mapCover={mapCover}
            
           />
@@ -748,9 +759,11 @@ export default function Page() {
       )}
 
       <SheetProvider onclose={onCloseSheet}>
-        <BottomSheet
+         <BottomSheet 
+          bottomView = {bottomView}
+          openDetail = {openDetail}
+          closeAll  = {closeAll}
           ref={sheetRef}
-          selected={selected}
           sheet={sheet}
           setSheet={setSheet}
           yOverride={sheetYOverride}

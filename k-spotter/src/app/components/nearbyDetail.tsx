@@ -1,27 +1,19 @@
 "use client";
 import Image from "next/image";
-import { NearbyPlace, Place } from "../../../type/type";
+import { NearbyPlace, Place, selected } from "../../../type/type";
 
 
-type NearbyDetailProps = {
-  place : NearbyPlace
-  thumb?: string | null;
-  address?: string; // 원하면 숨겨도 됨
-  distanceText?: string; // "350m", "1.2km" 등
-  onSelect  :  (p : NearbyPlace) => void 
-  
-};
 
 export default function NearbyDetail({
   place,
   onSelectNearby
  
-}: {place : NearbyPlace , onSelectNearby  :  (p : NearbyPlace) => void }) {
+}: {place : NearbyPlace , onSelectNearby  :  (s : selected) => void }) {
 
  
   return (
     <> 
-      <button onClick={() =>onSelectNearby(place) }>
+      <button onClick={() =>onSelectNearby({kind : "nearby" , data : place}) }>
 
      
       <div className="flex gap-3">

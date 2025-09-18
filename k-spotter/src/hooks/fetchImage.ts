@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useRef } from "react";
-import { NearbyPlace, Place, PlaceM } from "../../type/type";
+import {  Place,  SheetView, toPlaceM } from "../../type/type";
 
 type PhotoItem = {
   galWebImageUrl?: string; // 실제 타입에 맞게 보강
@@ -16,10 +16,11 @@ type Deps = {
   }) => Promise<any[]>;
   GetKeywordSearch: (a: { keyword: string  ; signal : AbortSignal}) => Promise<Place[]>;
   SearchImage: (a: { title: string ; signal : AbortSignal }) => Promise<PhotoItem[]>;
-  setSelected: React.Dispatch<React.SetStateAction<PlaceM | null>>;
+  setBottomView: React.Dispatch<React.SetStateAction<SheetView>>
 };
 
-export function useSelectedLoader({ getSpotter, GetKeywordSearch, SearchImage, setSelected }: Deps) {
+export function useSelectedLoader({ getSpotter, GetKeywordSearch, SearchImage,  setBottomView }: Deps) {
+   
     const lastClickSeq = useRef(0);
     const abortRef = useRef<AbortController | null>(null);
   
@@ -48,8 +49,9 @@ export function useSelectedLoader({ getSpotter, GetKeywordSearch, SearchImage, s
   
       const imgs: PhotoItem[] = i.status === "fulfilled" ? (i.value ?? []) : [];
       const thumb = imgs[0]?.galWebImageUrl ?? null;
-      setSelected(prev => (prev && prev.id === item.id ? { ...prev, thumb } : prev));
-    }, [getSpotter, GetKeywordSearch, SearchImage, setSelected, withTimeout]);
+      setBottomView(prev => (prev.kind =="summaryPlaces" ? {kind : "detailPlace" , item : toPlaceM({...item , thumb}) } : 
+      prev.kind == "detailPlace" ? {...prev , item : {...prev.item , thumb}}  : {kind : "closed"}));
+    }, [getSpotter, GetKeywordSearch, SearchImage, setBottomView, withTimeout]);
   
     const cancel = useCallback(() => abortRef.current?.abort(), []);
   

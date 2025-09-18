@@ -10,7 +10,7 @@ export interface Place  {
     address : string 
     placeName : string 
     placeType : string ;
-    placedetail : string ; 
+    placeDetail : string ; 
     openHours : string ; 
     closedDay : string ; 
     phone : string ;
@@ -131,7 +131,23 @@ export type SearchItem = {
     name : string ; 
     category : string ; 
     total : string  ; 
+}
+
+export type SearchResultItem = {
+    placeName : string ; 
+    placeDetail : string ; 
 
 }
+
+export type SheetView =
+| { kind: 'summaryPlaces'; items: Place[] }
+| { kind: 'detailPlace';  item: PlaceM }
+| { kind : "closed"}
+ 
+
+export type selected = {kind : "place" ; data : Place } | {kind : "nearby" ; data : NearbyPlace} ; 
+
+
+
 
 
