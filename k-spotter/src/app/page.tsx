@@ -341,6 +341,7 @@ export default function Page() {
     nearbyAbortRef.current = null;
   }
 
+
   async function fetchPlacesForBBox(bbox: BBox) {
     const id = ++reqSeq.current;
 
@@ -503,7 +504,7 @@ export default function Page() {
     const cur = boxRef.current ?? readMapBBox(map.current);
     if (!cur) return;
     fetchPlacesForBBox(cur);
-  }, [userCategory, autoQuery]);
+  }, [ userCategory, autoQuery]);
 
   useEffect(() => {
     if (!mapRef.current) return;
