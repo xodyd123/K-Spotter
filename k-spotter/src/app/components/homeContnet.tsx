@@ -1,6 +1,9 @@
+
 import { Home } from "../../../type/type";
 
 export default function HomeComponent({value} : {value : Home}){
+
+ 
     
     const copy = async (text: string, label: string) => {
         try {

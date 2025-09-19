@@ -227,9 +227,22 @@ export default function Page() {
 
       if (s.kind === "place") {
         openDetail(toPlaceM(s.data));
-        loadAndPatchSelected(s.data); // 지금 이미지를 불러올때 상태를 변화 시키고 있음
+        loadAndPatchSelected(s.data); // 이미지를 불러올때 한번 더 상태를 변화 
       } else {
+ 
         setBottomView({ kind: "detailPlace", item: toPlaceM(s.data) });
+        const res = await fetch(
+          `/api/nearbyDetailPlace?contentTypeId=${s.data.contentTypeId}&placeId=${s.data.id}`
+        );
+
+        const data = await res.json()
+        const {openHours , closedDay , phone} = data 
+        const newItem = {...s.data , openHours , closedDay , phone} ; 
+
+        setBottomView({ kind: "detailPlace", item: toPlaceM(newItem) }); // 대신 라우팅 캐시에 업데이트 해야됨 
+
+        
+
       }
 
       if (!map.current) return; // 안전 가드

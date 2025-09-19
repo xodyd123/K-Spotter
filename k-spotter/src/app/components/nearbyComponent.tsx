@@ -1,15 +1,8 @@
-// app/components/nearbyComponent.tsx
 "use client";
 import NearbyDetail from "../../app/components/nearbyDetail"
 import type { NearbyPlace, selected } from "../../../type/type";
 
 
-function formatDist(d?: number | null) {
-
-  if (d == null) return undefined;
-  const n = typeof d === "string" ? parseFloat(d) : d;
-  return n < 1000 ? `${Math.round(n)}m` : `${(n / 1000).toFixed(1)}km`; // 거리 계산 
-}
 
 
 export default function NearbyComponent({ value ,  onSelectNearby}: { value: NearbyPlace[] ; onSelectNearby :  (s : selected) => void }) { 

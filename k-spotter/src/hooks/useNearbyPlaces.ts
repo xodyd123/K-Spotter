@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getNearbyPlaces } from '@/lib/mock/apitour/getNearbyPlaces';
-import type { Place, NearbyPlace, PlaceM } from "../../../k-spotter/type/type"
+import type {  NearbyPlace, PlaceM } from "../../../k-spotter/type/type"
 
 export type CatId = 'all' | '12' | '14' | '38' | '39';
 
@@ -39,7 +39,8 @@ export function useNearbyPlace(item : PlaceM){
             }),
           staleTime: 5 * 60_000,
           select: (res: NearbyAPIResult) => {
-            return res.items}, // ← NearbyPlace[]만 돌려주게
+            return res.items
+          }, // ← NearbyPlace[]만 돌려주게
 
     })
 

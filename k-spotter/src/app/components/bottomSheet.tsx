@@ -28,8 +28,6 @@ type BottomSheetProps = React.PropsWithChildren<{
   yOverride?: string | null; // 외부 보정(px 문자열) - 선택
   onSelectNearby: (s: selected) => Promise<void>;
   bottomView: SheetView;
-  openDetail: (items: PlaceM) => void;
-  closeAll: () => void;
 }>;
 
 const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
@@ -40,8 +38,6 @@ const BottomSheet = forwardRef<SheetHandle, BottomSheetProps>(
       yOverride,
       onSelectNearby,
       bottomView,
-      openDetail,
-      closeAll,
     }: BottomSheetProps,
     ref
   ) {
