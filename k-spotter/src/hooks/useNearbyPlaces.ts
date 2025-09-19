@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getNearbyPlaces } from '@/lib/mock/apitour/getNearbyPlaces';
-import type { Place, NearbyPlace, PlaceM } from "../../../k-spotter/type/type"
+import {type NearbyPlace, type PlaceM } from "../../../k-spotter/type/type"
 
 export type CatId = 'all' | '12' | '14' | '38' | '39';
 
@@ -10,7 +10,7 @@ const CTYPE_ID : Record<CatId , number|null> = {
     all: null, '12': 12, '14': 14, '38': 38, '39': 39,
 }
 
-const nearbyKey = (id: string, ctype: number | null, radius = 2000) => ['nearby', id, radius, ctype ?? 'all'] as const;
+export const nearbyKey = (id: string, ctype: number | null, radius = 2000) => ['nearby', id, radius, ctype ?? 'all'] as const;
    
 
 
@@ -22,7 +22,7 @@ export function useNearbyPlace(item : PlaceM){
     const qc = useQueryClient() ; 
 
     const ctype  = CTYPE_ID [cat] as number; 
-    const key = () => nearbyKey(item.id , ctype); 
+    const key = () => nearbyKey(item.id , ctype , 2000); 
 
     // 데이터 패칭 
     const {data , isLoading , isFetching , error} = useQuery({
@@ -39,7 +39,8 @@ export function useNearbyPlace(item : PlaceM){
             }),
           staleTime: 5 * 60_000,
           select: (res: NearbyAPIResult) => {
-            return res.items}, // ← NearbyPlace[]만 돌려주게
+            return res.items
+          }, // ← NearbyPlace[]만 돌려주게
 
     })
 
@@ -51,6 +52,7 @@ export function useNearbyPlace(item : PlaceM){
       return qc.prefetchQuery({
         queryKey: nearbyKey(item.id, nextCtype),
         queryFn: () =>
+
           getNearbyPlaces({
             lat: item.lat,
             lng: item.lng,
@@ -65,6 +67,8 @@ export function useNearbyPlace(item : PlaceM){
     },
     [item.id, item.lat, item.lng, qc]
   );
+
+ 
 
   return {
     cat, setCat,

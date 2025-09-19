@@ -45,6 +45,8 @@ export default function MarkerDetail({
 
   
 
+  
+  
   const home = {
     placeName: item.placeName,
     openHours: item.openHours,
@@ -57,6 +59,7 @@ export default function MarkerDetail({
   const [content, setContent] = useState<Content>({ type: "Home" });
 
   useEffect(() => {
+    console.log(data) ; 
     setContent({ type: "Home" });
   }, [item.id]);
 
@@ -75,34 +78,8 @@ export default function MarkerDetail({
     if (tab === "NearbyPlace") {
       
       setContent({ type: "NearbyPlace" });
-
-      // // 1) 캐시에 있으면 즉시 UI 업데이트
-      // const cached = qc.getQueryData<NearbyAPIResult>(key);
-      // if (cached) {
-
-      //   const data = adaptNearby(cached.items);
-      //   setContent({ type: "NearbyPlace", data });
-
-      //   // 백그라운드 최신화(선택)
-      //   qc.invalidateQueries({ queryKey: key, exact: true });
-      //   return;
-      // }
-
-      // // 2) 캐시에 없으면 가져오기(히트면 재요청 안 함)
-      // try {
-
-      //   const res = await qc.ensureQueryData<NearbyAPIResult>({
-      //     queryKey: key,
-      //     queryFn: fetchNearby(item),
-      //     staleTime: 5 * 60 * 1000, // 5분
-      //   });
-      //   console.log("res" , res.items);
-      //   setContent({ type: "NearbyPlace", data: res.items });
-      // } catch (e) {
-      //   // 에러뷰
-      // }
     }
-  }; // ← onTabClick 닫힘
+  }; 
 
   const onClose = () => {
     setSheet("closed"); 
@@ -115,7 +92,7 @@ export default function MarkerDetail({
   const onToggle = useCallback(() => {
     toggle({
       id: item.id,
-      title: item.title,
+      title: item.title ?? "" , 
       lat: item.lat,
       lng: item.lng,
       thumb: item.thumb ?? null,
@@ -144,7 +121,7 @@ export default function MarkerDetail({
   const onShare = useCallback(async () => {
     const text = `${item.placeName || item.title} • ${item.address}`;
     const url = `https://map.kakao.com/link/to/${encodeURIComponent(
-      item.title
+      item.title ?? ''
     )},${item.lat},${item.lng}`;
     if (navigator.share) {
       try {
@@ -227,7 +204,7 @@ export default function MarkerDetail({
         <div className="mt-5 flex flex-wrap gap-3">
           <a
             href={`https://map.kakao.com/link/to/${encodeURIComponent(
-              item.title
+              item.title ?? ""
             )},${item.lat},${item.lng}`}
             target="_blank"
             rel="noopener noreferrer"
@@ -273,7 +250,7 @@ export default function MarkerDetail({
           {thumb && !error ? (
             <Image
               src={thumb ?? ""}
-              alt={item.title}
+              alt={item.title ?? ""}
               fill
               sizes="100vw"
               className="object-cover"

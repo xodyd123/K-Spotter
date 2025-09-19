@@ -8,6 +8,7 @@ import {
   LatLng,
   Pins,
   Place,
+
   PlaceM,
   SearchItem,
   selected,
@@ -31,6 +32,9 @@ import { SearchImage } from "@/lib/mock/galley/searchImage";
 import { useSelectedLoader } from "../hooks/fetchImage";
 import { waitMapIdle } from "@/utils/waitMapIdle";
 import SearchContent from "./components/searchContent";
+import { useQueryClient } from "@tanstack/react-query";
+import { NearbyDetailPlace } from "@/lib/mock/apitour/getNearbyDetailPlace";
+import { nearbyKey } from "@/hooks/useNearbyPlaces";
 
 declare global {
   interface Window {
@@ -115,6 +119,7 @@ export default function Page() {
   const placeIdToMarkerRef = useRef<Map<number | string, kakao.maps.Marker>>(
     new Map()
   );
+  const qc= useQueryClient() ; 
 
   const openSummary = (items: Place[]) => {
     setSheet("half");
@@ -195,7 +200,7 @@ export default function Page() {
     if (!map.current) return;
     const m = map.current;
     let cur = m.getLevel();
-    const target = Math.max(1, targetLevel);
+    
 
     // (선택) 먼저 중심을 pos로 맞춰두면 줌 동안 '정중앙'에 고정됨
     programmaticMoveCntRef.current += 1;
@@ -227,9 +232,29 @@ export default function Page() {
 
       if (s.kind === "place") {
         openDetail(toPlaceM(s.data));
-        loadAndPatchSelected(s.data); // 지금 이미지를 불러올때 상태를 변화 시키고 있음
+        loadAndPatchSelected(s.data); // 이미지를 불러올때 한번 더 상태를 변화 
       } else {
+ 
         setBottomView({ kind: "detailPlace", item: toPlaceM(s.data) });
+        // // 캐시에 업데이트  - 일단 주석 
+        //   캐시 업데이트로 인해 카테고리 클릭한 장소의 근처에 같은 카테고리 장소는 반영 안됨. 
+        // await qc.fetchQuery({
+        //   queryKey : nearbyKey(s.data.id , Number(s.data.contentTypeId) ,2000) , 
+        //   queryFn : async () => {
+        //     const detail = await NearbyDetailPlace(s.data.id , s.data.contentTypeId) ;
+        //     return {...toPlaceM(s.data) , ...detail }
+        //   } ,
+        //   staleTime: 5 * 60_000,
+        // }
+
+        // ) 
+
+        const detail = await NearbyDetailPlace(s.data.id, s.data.contentTypeId);
+        setBottomView({
+          kind: "detailPlace",
+          item: toPlaceM({ ...s.data, ...detail }), // ← 새 객체
+        });
+
       }
 
       if (!map.current) return; // 안전 가드
@@ -243,7 +268,7 @@ export default function Page() {
       // 3) 선택 마커 생성/재부착 (사이드이펙트용, 반환값 사용 안 함)
       selectedMarker(pos, m);
 
-      openDetail(toPlaceM(s.data));
+        //openDetail(toPlaceM(s.data));
       // 오프셋 패닝
 
       await focusZoomTo(pos);

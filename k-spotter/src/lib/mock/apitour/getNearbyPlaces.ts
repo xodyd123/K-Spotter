@@ -20,10 +20,11 @@ export async function getNearbyPlaces({
     qs.append("radius" ,String(radius))  ; 
     qs.append("englishOnly"  ,englishOnly ? "1" : "0")  ; 
     contentTypeId.forEach(item => qs.append("contentTypeId" , String(item))) ; 
-    console.log(qs.toString());
     const res = await fetch(`/api/nearby?${qs.toString()}`); 
 
-    const json =  res.json();
+    const json =  res.json(); 
+
+     
   
 
   

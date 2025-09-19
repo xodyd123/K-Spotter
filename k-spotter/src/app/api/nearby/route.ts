@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { category, Place, PlaceM, TourItem } from "../../../../type/type";
+import { category, NearbyPlace, TourItem } from "../../../../type/type";
 
 const ENDPOINT = "https://apis.data.go.kr/B551011/KorService2/locationBasedList2";
 
@@ -34,6 +34,7 @@ function buildURL(params: Record<string, string>) {
 function normalizeItems(j: any) {
   
   const raw = j?.response?.body?.items?.item;
+
 
   return Array.isArray(raw) ? raw : raw ? [raw] : [];
 }
@@ -99,36 +100,29 @@ for (const s of settled) {
   }
   const uniq = Array.from(uniqMap.values());
 
-  console.log("uniq" , uniq) ;
 
  
   
   // Place 매핑 (lat=mapy, lng=mapx 주의)
-  const items: PlaceM[] = uniq
+  const items: NearbyPlace[] = uniq
   .filter(it => it.mapx != null && it.mapy != null)
-  .map((it, i) => {
-    // 안전 파싱
-    const n = Number(it.contenttypeid);
-    const contentTypeId = Number.isFinite(n) ? n : undefined;
-
-
+  .map((it) => {
 
     return {
-      id: String(it.contentid ?? it.title ?? Math.random()),
-      title: it.title ?? "",
+      id: String(it.contentid ) ,
       lat: Number(it.mapy),   // 위도
       lng: Number(it.mapx),   // 경도
-      addr: it.addr1 ?? "",
-      thumb: it.firstimage  ?? null , 
-      contentTypeId,
+      addr: it.addr1 ?? '' , 
+      thumb: it.firstimage ?? '' ,
       category: category.OTHER,
-      placename : it.title ,
-      address : it.addr1 ,
+      placeName : it.title ,
       source : "nearby" , 
-    } as PlaceM;
+      contentTypeId : it.contenttypeid
+    } 
   });
   
   const limit = Number(sp.get("limit") ?? 100);
+  
   const sliced = items.slice(0, limit); 
 
  

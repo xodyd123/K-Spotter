@@ -21,15 +21,20 @@ export type NearbyPlace = {
     id : string ; 
     lat : number ; 
     lng : number ;  
-    title : string ; 
     category? :string ; 
     thumb : string ;  
+    placeName : string ; 
+    contentTypeId : number 
+    openHours?: string;
+    closedDay?: string;
+    phone?: string;
+    
 }   
 export type PlaceM = {
     id: string;
     lat: number;
     lng: number;
-    title: string;
+    title?: string;
     category?: string;
     thumb: string | null;        // ← 통일
     address?: string;            // Nearby.addr → 여기로 매핑
@@ -44,7 +49,6 @@ export type PlaceM = {
   
   export function toPlaceM(x: Place | NearbyPlace): PlaceM {
     if ('address' in x) {
-        console.log(x.closedDay)
       // Place
       return {
         id: x.id, lat: x.lat, lng: x.lng, title: x.title,
@@ -62,17 +66,23 @@ export type PlaceM = {
     }
     // NearbyPlace
     return {
-      id: x.id, lat: x.lat, lng: x.lng, title: x.title,
+      id: x.id, lat: x.lat, lng: x.lng, 
+      placeName : x.placeName,
       category: x.category,
       thumb: x.thumb ?? null,
-      address: x.addr,              // ★ addr → address로 통일
+      address: x.addr,      
+      contentTypeId : x.contentTypeId ,   
+      openHours : x.openHours ,
+      closedDay : x.closedDay , 
+      phone : x.phone ,
+            // ★ addr → address로 통일
       source: 'nearby' as const,    // ★ 리터럴로 고정
     };
   }
 
 export type TourItem = {
     contentid?: string | number;      // ✅ 고유 ID (dedupe/Place.id에 사용)
-    contenttypeid?: string | number;  // ✅ 유형 (Place.contentTypeId에 매핑)
+    contenttypeid:  number;  // ✅ 유형 (Place.contentTypeId에 매핑)
     mapx?: string | number;           // 경도
     mapy?: string | number;           // 위도
     title: string;
@@ -94,8 +104,6 @@ export type DetailPlace = { // 임시
 } 
   
 
-
-
 export enum category{
 
     DRAMA = "Drama" ,
@@ -108,7 +116,6 @@ export enum category{
 
 
 }
-
 
 export type ca =  "Drama" | "Movie" | "MusicVideo";
 
@@ -146,8 +153,6 @@ export type SheetView =
  
 
 export type selected = {kind : "place" ; data : Place } | {kind : "nearby" ; data : NearbyPlace} ; 
-
-
 
 
 

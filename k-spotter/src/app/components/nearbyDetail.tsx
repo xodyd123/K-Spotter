@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { NearbyPlace, Place, selected } from "../../../type/type";
+import { NearbyPlace, selected } from "../../../type/type";
 
 
 
@@ -10,7 +10,7 @@ export default function NearbyDetail({
  
 }: {place : NearbyPlace , onSelectNearby  :  (s : selected) => void }) {
 
- 
+  
   return (
     <> 
       <button onClick={() =>onSelectNearby({kind : "nearby" , data : place}) }>
@@ -27,7 +27,7 @@ export default function NearbyDetail({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
-            <h4 className="flex-1 truncate text-[15px] font-semibold text-gray-900">{place.title}</h4>
+            <h4 className="flex-1 truncate text-[15px] font-semibold text-gray-900">{place.placeName}</h4>
             {/* {distanceText && (
               <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">{distanceText}</span>
             )} */}
