@@ -44,6 +44,9 @@ export default function MarkerDetail({
   const { cat, setCat, data, prefetch } = useNearbyPlace(item);
 
   
+
+  
+  
   const home = {
     placeName: item.placeName,
     openHours: item.openHours,
@@ -56,7 +59,7 @@ export default function MarkerDetail({
   const [content, setContent] = useState<Content>({ type: "Home" });
 
   useEffect(() => {
-    console.log("home"  , home);
+    console.log(data) ; 
     setContent({ type: "Home" });
   }, [item.id]);
 

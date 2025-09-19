@@ -104,8 +104,6 @@ export type DetailPlace = { // 임시
 } 
   
 
-
-
 export enum category{
 
     DRAMA = "Drama" ,
@@ -118,7 +116,6 @@ export enum category{
 
 
 }
-
 
 export type ca =  "Drama" | "Movie" | "MusicVideo";
 
@@ -156,8 +153,6 @@ export type SheetView =
  
 
 export type selected = {kind : "place" ; data : Place } | {kind : "nearby" ; data : NearbyPlace} ; 
-
-
 
 
 
