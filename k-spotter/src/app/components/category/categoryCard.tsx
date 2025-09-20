@@ -1,5 +1,5 @@
 import { JSX } from "react";
-import { ca} from "../../../type/type"
+import { ca} from "../../../../type/type"
 import { memo } from "react";
 import {
     TvIcon,

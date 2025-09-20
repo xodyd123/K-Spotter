@@ -60,24 +60,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: `API error ${code}` }, { status: 502 });
   }
 
-  // ✅ item 추출(단일/배열 모두 처리)
   const rawItem = json?.response?.body?.items?.item;
   const item = Array.isArray(rawItem) ? rawItem[0] : rawItem;
-  console.log("item" , item) ;
+
   if (!item) {
     return NextResponse.json({ error: "No detail item" }, { status: 404 });
   }
 
-  // ✅ 카테고리별 키 fallback(음식점 39 외도 어느 정도 견딤)
-  const pick = ( ...cands: Array<string | undefined> ) =>
+
+  const pick = ( cands: Array<string | undefined> ) =>
     cands.find(v => v !== undefined && v !== null && String(v).trim() !== "") ?? "";
 // 주어진 base키들에 대해, 접미사 버전 → 일반키 순으로 탐색
+
 const pickWithSuffix = (obj: any, suffix: string, bases: string[]) => {
     const keys = [
       ...bases.map(b => suffix ? `${b}${suffix}` : b),
-      ...bases, // fallback: 일반키도 시도
+      ...bases, 
     ];
-    return pick(...keys.map(k => obj?.[k]));
+    return pick(keys.map(k => obj?.[k]));
   };
   
   const suffix = SUFFIX[contentTypeId] ?? "";

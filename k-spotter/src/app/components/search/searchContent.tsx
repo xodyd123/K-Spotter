@@ -1,4 +1,4 @@
-import type { SearchItem } from "../../../type/type";
+import type { SearchItem } from "../../../../type/type";
 import SearchDetail from "./searchDetail";
 
 export default function SearchContent({

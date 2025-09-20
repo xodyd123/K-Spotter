@@ -1,7 +1,7 @@
 // SearchBottomLayout.tsx
 "use client";
 
-import type { NearbyPlace, Place, selected } from "../../../type/type";
+import type { NearbyPlace, Place, selected } from "../../../../type/type";
 import SearchResult from "./searchResult";
 
 export default function SearchBottomLayout({ items ,onSelectNearby }: { items: Place[] ,  onSelectNearby : (s : selected) => Promise<void>}) {

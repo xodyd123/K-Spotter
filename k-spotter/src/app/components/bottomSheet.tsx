@@ -8,9 +8,9 @@ import type {
   selected,
   SheetView,
 } from "../../../type/type";
-import MarkerDetail from "./markerDetail";
+import MarkerDetail from "./nearby/markerDetail";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
-import SearchBottomLayout from "./searchBottomLayout";
+import SearchBottomLayout from "./search/searchBottomLayout";
 
 export type SheetState = "closed" | "peek" | "half" | "full";
 

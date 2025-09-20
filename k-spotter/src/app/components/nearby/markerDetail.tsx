@@ -3,16 +3,18 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useFavorites } from "@/hooks/useLocalStorage";
-import { DetailPlace, NearbyPlace, PlaceM, selected } from "../../../type/type";
-import HomeComponent from "./homeContnet";
+import { PlaceM, selected } from "../../../../type/type";
+import HomeComponent from "../homeContnet";
 import NearbyComponent from "./nearbyComponent";
 import { useNearbyPlace } from "@/hooks/useNearbyPlaces";
-import { SheetState } from "./bottomSheet";
+import { SheetState } from "../bottomSheet";
+
+import DetailInfo from "../detail/detailInfo";
 
 type Content =
   | { type: "Home" }
   | { type: "NearbyPlace" }
-  | { type: "DetailPlace"; data: DetailPlace }
+  | { type: "DetailInfo" }
   | null;
 
 // 칩 정의
@@ -45,8 +47,6 @@ export default function MarkerDetail({
 
   
 
-  
-  
   const home = {
     placeName: item.placeName,
     openHours: item.openHours,
@@ -59,7 +59,6 @@ export default function MarkerDetail({
   const [content, setContent] = useState<Content>({ type: "Home" });
 
   useEffect(() => {
-    console.log(data) ; 
     setContent({ type: "Home" });
   }, [item.id]);
 
@@ -68,16 +67,21 @@ export default function MarkerDetail({
     const tab = e.currentTarget.dataset.tab as
       | "Home"
       | "NearbyPlace"
-      | "DetailPlace";
+      | "DetailInfo";
 
     if (tab === "Home") {
       setContent({ type: "Home" });
       return;
     }
 
-    if (tab === "NearbyPlace") {
+    else if (tab === "NearbyPlace") {
       
       setContent({ type: "NearbyPlace" });
+    }
+
+    else if (tab === "DetailInfo") {
+      
+      setContent({ type: "DetailInfo" });
     }
   }; 
 
@@ -314,6 +318,8 @@ export default function MarkerDetail({
             <NearbyComponent value={data} onSelectNearby={onSelectNearby} />
           </>
         )}
+
+      {content && content.type === "DetailInfo" && <DetailInfo/>}
       </div>
     </section>
   );

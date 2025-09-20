@@ -1,4 +1,4 @@
-import type { SearchItem } from "../../../type/type";
+import type { SearchItem } from "../../../../type/type";
 import { Clapperboard, Film, User } from "lucide-react";
 
 type Props = {

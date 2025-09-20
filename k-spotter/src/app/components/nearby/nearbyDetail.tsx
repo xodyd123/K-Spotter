@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { NearbyPlace, selected } from "../../../type/type";
+import { NearbyPlace, selected } from "../../../../type/type";
 
 
 
