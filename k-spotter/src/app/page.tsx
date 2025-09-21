@@ -15,7 +15,7 @@ import {
   SheetView,
   toPlaceM,
 } from "../../type/type";
-import SearchBar from "./components/searchBar";
+import SearchBar from "./components/search/searchBar";
 
 import BottomSheet, { SheetHandle } from "./components/bottomSheet";
 import {
@@ -31,10 +31,9 @@ import { SearchImage } from "@/lib/mock/galley/searchImage";
 
 import { useSelectedLoader } from "../hooks/fetchImage";
 import { waitMapIdle } from "@/utils/waitMapIdle";
-import SearchContent from "./components/searchContent";
+import SearchContent from "./components/search/searchContent";
 import { useQueryClient } from "@tanstack/react-query";
 import { NearbyDetailPlace } from "@/lib/mock/apitour/getNearbyDetailPlace";
-import { nearbyKey } from "@/hooks/useNearbyPlaces";
 
 declare global {
   interface Window {

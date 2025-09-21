@@ -1,6 +1,6 @@
 "use client";
-import NearbyDetail from "../../app/components/nearbyDetail"
-import type { NearbyPlace, selected } from "../../../type/type";
+import NearbyDetail from "./nearbyDetail"
+import type { NearbyPlace, selected } from "../../../../type/type";
 
 
 

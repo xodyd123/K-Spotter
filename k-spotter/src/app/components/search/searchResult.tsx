@@ -1,7 +1,7 @@
 // searchResult.tsx
 "use client";
 
-import type { Place, selected } from "../../../type/type";
+import type { Place, selected } from "../../../../type/type";
 import { MapPin } from "lucide-react";
 
 type Props = {

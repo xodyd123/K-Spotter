@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { CategoryCard } from "./categoryCard";
-import type { ca } from "../../../type/type";
+import type { ca } from "../../../../type/type";
 
 const categories = ["Drama", "Movie", "MusicVideo"] as const;
 
