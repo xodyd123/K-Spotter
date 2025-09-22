@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
       // 필요하면 추가
       { protocol: "https", hostname: "korean.visitkorea.or.kr", pathname: "/**" },
       { protocol: "https", hostname: "api.visitkorea.or.kr",    pathname: "/**" },
+      { protocol: 'https', hostname: 'image.tmdb.org' },
+      
     ],
   },
 };

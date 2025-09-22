@@ -43,9 +43,8 @@ export default function MarkerDetail({
 
   const { toggle, isFavorite } = useFavorites();
   const fav = isFavorite(item.id);
-  const { cat, setCat, data, prefetch } = useNearbyPlace(item);
+  const { cat, setCat, data, prefetch , detailData } = useNearbyPlace(item); 
 
-  
 
   const home = {
     placeName: item.placeName,
@@ -285,7 +284,7 @@ export default function MarkerDetail({
           <button onClick={onTabClick} data-tab="NearbyPlace">
             주변
           </button>
-          <button onClick={onTabClick} data-tab="DetailPlace">
+          <button onClick={onTabClick} data-tab="DetailInfo">
             정보
           </button>
         </div>
@@ -319,7 +318,7 @@ export default function MarkerDetail({
           </>
         )}
 
-      {content && content.type === "DetailInfo" && <DetailInfo/>}
+      {content && content.type === "DetailInfo" &&  detailData && <DetailInfo datailData = {detailData}/>}
       </div>
     </section>
   );

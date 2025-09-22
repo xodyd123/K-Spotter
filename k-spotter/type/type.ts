@@ -154,5 +154,37 @@ export type SheetView =
 
 export type selected = {kind : "place" ; data : Place } | {kind : "nearby" ; data : NearbyPlace} ; 
 
-
+// 출연진
+export type CastMember = {
+    name: string;
+    role: string;
+  };
+  
+  // 시청 제공자
+  export type WatchProvider = {
+    logo_path: string | null;
+    provider_id: number;
+    provider_name: string;
+    display_priority: number;
+  };
+  
+  // 시청 정보(국가/플랜별로 옵션이 늘 수 있어 선택적 필드 허용)
+  export type WatchInfo = {
+    link: string;
+    flatrate?: WatchProvider[];
+    buy?: WatchProvider[];
+    rent?: WatchProvider[];
+  };
+  
+  // 최상위 상세 응답
+  export type ShowDetail = {
+    id: number;
+    title: string;
+    overview: string;
+    year: number;
+    cast: CastMember[];
+    stills: string[];   // 이미지 URL들
+    watch: WatchInfo;
+  };
+  
 

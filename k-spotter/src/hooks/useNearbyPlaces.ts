@@ -1,65 +1,74 @@
-'use client';
-import { useState, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getNearbyPlaces } from '@/lib/mock/apitour/getNearbyPlaces';
-import {type NearbyPlace, type PlaceM } from "../../../k-spotter/type/type"
+"use client";
+import { useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getNearbyPlaces } from "@/lib/mock/api/getNearbyPlaces";
+import { ShowDetail, type NearbyPlace, type PlaceM } from "../../../k-spotter/type/type";
+import { tmdbDetailByTitle } from "@/lib/mock/api/tmdb";
 
-export type CatId = 'all' | '12' | '14' | '38' | '39';
+export type CatId = "all" | "12" | "14" | "38" | "39";
 
-const CTYPE_ID : Record<CatId , number|null> = {
-    all: null, '12': 12, '14': 14, '38': 38, '39': 39,
-}
+const CTYPE_ID: Record<CatId, number | null> = {
+  all: null,
+  "12": 12,
+  "14": 14,
+  "38": 38,
+  "39": 39,
+};
 
-export const nearbyKey = (id: string, ctype: number | null, radius = 2000) => ['nearby', id, radius, ctype ?? 'all'] as const;
-   
+export const nearbyKey = (id: string, ctype: number | null, radius = 2000) =>
+  ["nearby", id, radius, ctype ?? "all"] as const;
 
+type NearbyAPIResult = { items: NearbyPlace[]; count: number }; // 실제 API에 맞게 조정
 
-type NearbyAPIResult = { items: NearbyPlace[]; count: number }; // 실제 API에 맞게 조정 
+export function useNearbyPlace(item: PlaceM) {
+  const [cat, setCat] = useState<CatId>("39");
+  const qc = useQueryClient();
 
-export function useNearbyPlace(item : PlaceM){
+  const ctype = CTYPE_ID[cat] as number;
+  const key = () => nearbyKey(item.id, ctype, 2000);
+
+  // 데이터 패칭
+  const { data, isLoading, isFetching, error } = useQuery({
+    queryKey: key(),
+    queryFn: () =>
+      getNearbyPlaces({
+        lat: item.lat,
+        lng: item.lng,
+        id: item.id,
+        radius: 2000,
+        cats: ["food", "cafe", "attraction"],
+        sort: "reco",
+        contentTypeId: [ctype],
+      }),
+    staleTime: 5 * 60_000,
+    select: (res: NearbyAPIResult) => {
+      return res.items;
+    }, // ← NearbyPlace[]만 돌려주게
+  });
+
+  const {
+    data: detailData,
+  } = useQuery<ShowDetail, Error>({
+    queryKey: ["detailInfo", item.title] as const,
+    queryFn: ({ signal }) => tmdbDetailByTitle(item.title!, { signal }),
     
-    const [cat, setCat] = useState<CatId>('39');
-    const qc = useQueryClient() ; 
+    // enabled 기본값 true
+  });
 
-    const ctype  = CTYPE_ID [cat] as number; 
-    const key = () => nearbyKey(item.id , ctype , 2000); 
-
-    // 데이터 패칭 
-    const {data , isLoading , isFetching , error} = useQuery({
-        queryKey : key() ,
-        queryFn: () =>
-            getNearbyPlaces({
-              lat: item.lat,
-              lng: item.lng,
-              id: item.id,
-              radius: 2000,
-              cats: ['food', 'cafe', 'attraction'],
-              sort: 'reco',
-              contentTypeId: [ctype] 
-            }),
-          staleTime: 5 * 60_000,
-          select: (res: NearbyAPIResult) => {
-            return res.items
-          }, // ← NearbyPlace[]만 돌려주게
-
-    })
-
-     // 칩 프리페치(호버/터치 시)
+  // 칩 프리페치(호버/터치 시)
   const prefetch = useCallback(
     (next: CatId) => {
-  
-      const nextCtype = CTYPE_ID[next] as number
+      const nextCtype = CTYPE_ID[next] as number;
       return qc.prefetchQuery({
         queryKey: nearbyKey(item.id, nextCtype),
         queryFn: () =>
-
           getNearbyPlaces({
             lat: item.lat,
             lng: item.lng,
             id: item.id,
             radius: 2000,
-            cats: ['food', 'cafe', 'attraction'],
-            sort: 'reco',
+            cats: ["food", "cafe", "attraction"],
+            sort: "reco",
             contentTypeId: [nextCtype],
           }),
         staleTime: 5 * 60_000,
@@ -68,14 +77,15 @@ export function useNearbyPlace(item : PlaceM){
     [item.id, item.lat, item.lng, qc]
   );
 
- 
-
   return {
-    cat, setCat,
-    data: data ?? [],           // NearbyPlace[]
-    isLoading, isFetching, error,
+    cat,
+    setCat,
+    data: data ?? [], // NearbyPlace[]
+    isLoading,
+    isFetching,
+    error,
     prefetch,
-    key,                        // 필요 시 접근
+    key,
+    detailData, // 필요 시 접근
   };
-
 }

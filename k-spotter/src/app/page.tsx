@@ -25,15 +25,15 @@ import {
 } from "./service/panWithOffset";
 import { SheetProvider } from "./components/sheetProvider";
 import { decideSheetOrPan } from "./service/decideSheetOrPan";
-import { getSpotter } from "@/lib/mock/apitour/getSpotter";
-import { GetKeywordSearch } from "../lib/mock/apitour/getKeyword";
+import { getSpotter } from "@/lib/mock/api/getSpotter";
+import { GetKeywordSearch } from "../lib/mock/api/getKeyword";
 import { SearchImage } from "@/lib/mock/galley/searchImage";
 
 import { useSelectedLoader } from "../hooks/fetchImage";
 import { waitMapIdle } from "@/utils/waitMapIdle";
 import SearchContent from "./components/search/searchContent";
 import { useQueryClient } from "@tanstack/react-query";
-import { NearbyDetailPlace } from "@/lib/mock/apitour/getNearbyDetailPlace";
+import { NearbyDetailPlace } from "@/lib/mock/api/getNearbyDetailPlace";
 
 declare global {
   interface Window {
