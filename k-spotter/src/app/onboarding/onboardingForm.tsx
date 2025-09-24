@@ -1,13 +1,34 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import Image from "next/image";
+import { useState, useTransition } from "react";
 import { savePrefsAction } from "../actions/savePrefs";
 
 const PURPOSES = [
-  { value: "K_POP", label: "K-pop" },
-  { value: "DRAMA_FILM", label: "K-drama & Film" },
-  { value: "FOOD", label: "K-food" },
-  { value: "SIGHTSEEING", label: "K-Sightseeing" },
+  {
+    value: "K_POP",
+    label: "K-pop",
+    img: "/onboarding/kpop.jpg",
+    alt: "Purple light sticks glowing at a K-pop concert",
+  },
+  {
+    value: "DRAMA_FILM",
+    label: "K-drama & Film",
+    img: "/onboarding/kdrama-film.jpg",
+    alt: "Film set with clapperboard and cinema lights",
+  },
+  {
+    value: "FOOD",
+    label: "K-food",
+    img: "/onboarding/kfood.jpg",
+    alt: "Korean dishes and banchan on a wooden table",
+  },
+  {
+    value: "SIGHTSEEING",
+    label: "K-Sightseeing",
+    img: "/onboarding/ksightseeing.jpg",
+    alt: "Lotte World Tower night skyline over the Han River",
+  },
 ];
 
 export default function OnboardingForm() {
@@ -16,19 +37,18 @@ export default function OnboardingForm() {
   const [error, setError] = useState<string | null>(null);
 
   const toggle = (val: string) => {
-    setSelected((prev) => {
+    setSelected(prev => {
       const has = prev.includes(val);
-      if (has) return prev.filter((v) => v !== val);
-      return [...prev, val];
+      const next = has ? prev.filter(v => v !== val) : [...prev, val];
+      if (error && next.length > 0) setError(null);
+      return next;
     });
   };
 
   const check = (fd: FormData) => {
     const purposes = fd.getAll("purpose") as string[];
-
     if (purposes.length === 0) {
       setError("Please select at least one option.");
-
       return;
     }
     setError(null);
@@ -48,30 +68,60 @@ export default function OnboardingForm() {
           {error}
         </p>
       )}
-      {/* 선택값을 폼으로 보내기 위한 hidden inputs */}
-      {selected.map((v) => (
+
+      {/* 선택값 전달용 hidden inputs */}
+      {selected.map(v => (
         <input key={v} type="hidden" name="purpose" value={v} />
       ))}
 
-      <fieldset className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          {PURPOSES.map((p) => {
+      <fieldset
+        aria-invalid={!!error}
+        aria-describedby={error ? "purpose-error" : undefined}
+        className="space-y-3"
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {PURPOSES.map(p => {
             const active = selected.includes(p.value);
-
             return (
               <button
                 key={p.value}
                 type="button"
-                aria-pressed={active}
                 onClick={() => toggle(p.value)}
+                aria-pressed={active}
+                aria-label={`${p.label}${active ? " selected" : ""}`}
                 className={[
-                  "rounded-full px-4 py-2 text-sm border transition",
+                  "relative overflow-hidden rounded-xl border text-left outline-none transition",
                   active
-                    ? "bg-black text-white border-black"
-                    : "bg-white text-black border-gray-300 hover:bg-gray-100",
+                    ? "ring-2 ring-black border-transparent"
+                    : "border-neutral-300 hover:border-neutral-400",
+                  "focus-visible:ring-2 focus-visible:ring-black/40",
                 ].join(" ")}
               >
-                {p.label}
+                <div className="relative aspect-[4/5]">
+                  <Image
+                    src={p.img}
+                    alt={p.alt}
+                    fill
+                    sizes="(min-width: 640px) 25vw, 50vw"
+                    className="object-cover"
+                    priority
+                  />
+                  {/* 어둡게 + 선택 오버레이 */}
+                  <div
+                    className={[
+                      "absolute inset-0 transition",
+                      active ? "bg-black/25" : "bg-black/0 hover:bg-black/10",
+                    ].join(" ")}
+                  />
+                  {active && (
+                    <span className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-black shadow ring-2 ring-black">
+                      ✓
+                    </span>
+                  )}
+                  <span className="absolute inset-x-0 bottom-0 w-full bg-gradient-to-t from-black/60 to-transparent px-3 py-2 text-sm font-medium text-white">
+                    {p.label}
+                  </span>
+                </div>
               </button>
             );
           })}
@@ -81,18 +131,12 @@ export default function OnboardingForm() {
       <button
         type="submit"
         disabled={pending}
-        aria-label="Continue to step 2 of 2"
+        aria-label="Show spots"
         className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-black text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/35 disabled:opacity-60"
       >
-        {pending ? (
-          "Saving…"
-        ) : (
+        {pending ? "Saving…" : (
           <>
-            <span className="font-medium">Next</span>
-            <span aria-hidden className="ml-2 text-xs opacity-70">
-              Step 1 of 2
-            </span>
-            {/* <span className="sr-only">Step 1 of 2</span>  // 화면 숨김 텍스트로 대체도 가능 */}
+            <span className="font-medium">Show spots</span>
           </>
         )}
       </button>
