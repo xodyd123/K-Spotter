@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "korean.visitkorea.or.kr", pathname: "/**" },
       { protocol: "https", hostname: "api.visitkorea.or.kr",    pathname: "/**" },
       { protocol: 'https', hostname: 'image.tmdb.org' },
+      { protocol: 'https', hostname: 'images.pexels.com' },
+      { protocol: "https", hostname: "images.unsplash.com" },
+   
       
     ],
   },

@@ -6,8 +6,9 @@ import { redirect } from "next/navigation";
 
 export async function savePrefsAction(formData: FormData) {
   // 폼 → 객체 
-  console.log("formdata" , formData ); 
+
   const purposes = formData.getAll("purpose") as string[];
+  console.log(purposes); 
   const vibe = formData.get("vibe") as string | null;
 
   const data = {

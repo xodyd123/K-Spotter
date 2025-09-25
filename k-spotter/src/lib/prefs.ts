@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SignJWT, jwtVerify } from "jose";
 
 export const PrefsSchema = z.object({
-  purposes: z.array(z.enum(["K_POP","DRAMA_FILM","FOOD","SIGHTSEEING"])).min(0).max(4),
+  purposes: z.array(z.enum(["K_POP","DRAMA_FILM","FOOD",'NATURE', 'CITY', 'CULTURE', 'HANOK'])).min(0).max(4),
   vibe: z.enum(["NIGHT","PHOTOGENIC","COZY","NATURE"]).optional(),
   ts: z.number(), // epoch ms
 });

@@ -1,33 +1,53 @@
 "use client";
-
 import Image from "next/image";
 import { useState, useTransition } from "react";
 import { savePrefsAction } from "../actions/savePrefs";
 
 const PURPOSES = [
+  // ✅ 신규 4개 카테고리
+  {
+    value: "HANOK",
+    label: "한옥",
+    img: "/onboarding/hanok.jpg",
+    alt: "노을빛이 비치는 한옥 골목 풍경",
+  },
+  {
+    value: "NATURE",
+    label: "자연",
+    img: "/onboarding/nature.jpg",
+    alt: "초록 숲 사이로 우뚝 솟은 산봉우리",
+  },
+  {
+    value: "CITY",
+    label: "도시",
+    img: "/onboarding/city.jpg",
+    alt: "한강과 고층 빌딩, N서울타워가 보이는 도심 야경",
+  },
+  {
+    value: "CULTURE",
+    label: "문화",
+    img: "/onboarding/culture.jpg",
+    alt: "붉은 간판과 노란 등불이 늘어선 야시장 골목",
+  },
+
+  // 기존 항목(원하면 유지)
   {
     value: "K_POP",
     label: "K-pop",
     img: "/onboarding/kpop.jpg",
-    alt: "Purple light sticks glowing at a K-pop concert",
+    alt: "K-pop 콘서트에서 빛나는 응원봉",
   },
   {
     value: "DRAMA_FILM",
     label: "K-drama & Film",
     img: "/onboarding/kdrama-film.jpg",
-    alt: "Film set with clapperboard and cinema lights",
+    alt: "클래퍼보드와 조명으로 꾸민 촬영 현장",
   },
   {
     value: "FOOD",
     label: "K-food",
     img: "/onboarding/kfood.jpg",
-    alt: "Korean dishes and banchan on a wooden table",
-  },
-  {
-    value: "SIGHTSEEING",
-    label: "K-Sightseeing",
-    img: "/onboarding/ksightseeing.jpg",
-    alt: "Lotte World Tower night skyline over the Han River",
+    alt: "한식 반찬과 요리가 놓인 식탁",
   },
 ];
 
@@ -48,7 +68,7 @@ export default function OnboardingForm() {
   const check = (fd: FormData) => {
     const purposes = fd.getAll("purpose") as string[];
     if (purposes.length === 0) {
-      setError("Please select at least one option.");
+      setError("최소 한 가지 이상 선택해 주세요.");
       return;
     }
     setError(null);
@@ -88,7 +108,7 @@ export default function OnboardingForm() {
                 type="button"
                 onClick={() => toggle(p.value)}
                 aria-pressed={active}
-                aria-label={`${p.label}${active ? " selected" : ""}`}
+                aria-label={`${p.label}${active ? " 선택됨" : ""}`}
                 className={[
                   "relative overflow-hidden rounded-xl border text-left outline-none transition",
                   active
@@ -106,7 +126,6 @@ export default function OnboardingForm() {
                     className="object-cover"
                     priority
                   />
-                  {/* 어둡게 + 선택 오버레이 */}
                   <div
                     className={[
                       "absolute inset-0 transition",
@@ -119,7 +138,7 @@ export default function OnboardingForm() {
                     </span>
                   )}
                   <span className="absolute inset-x-0 bottom-0 w-full bg-gradient-to-t from-black/60 to-transparent px-3 py-2 text-sm font-medium text-white">
-                    {p.label}
+                    {p.value}
                   </span>
                 </div>
               </button>
@@ -134,11 +153,7 @@ export default function OnboardingForm() {
         aria-label="Show spots"
         className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-black text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/35 disabled:opacity-60"
       >
-        {pending ? "Saving…" : (
-          <>
-            <span className="font-medium">Show spots</span>
-          </>
-        )}
+        {pending ? "Saving…" : <span className="font-medium">Show spots</span>}
       </button>
     </form>
   );
