@@ -1,14 +1,14 @@
 "use client";
-import { usePexelsFeed } from "../hooks/usePexelsFeed(";
+import { usePexelsFeed } from "../hooks/usePexelsFeed";
 import { MediaCard } from "../app/mediaCard";
 
 export default function PexelsGrid() {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    usePexelsFeed({ q: "Korea seaside beach coast", type: "all" });
+    usePexelsFeed({ q: "대한민국 한옥 한옥마을 전통 건축", type: "all" });
 
   const items = data?.pages.flatMap((p: any) => p.items) ?? [];
 
-  console.log("items" , items) ;
+  
 
   return (
     <main className="mx-auto grid max-w-6xl grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-4">

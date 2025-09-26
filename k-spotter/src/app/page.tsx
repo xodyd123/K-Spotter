@@ -4,6 +4,7 @@ import { verifyPrefs } from "@/lib/prefs";
 
 import { redirect } from "next/navigation";
 import PexelsGrid from "./PexelsGrid";
+import UnsplashGrid from "./unsplash";
 
 
 export default async function Page() { 
@@ -19,8 +20,8 @@ export default async function Page() {
   // 리턴 사용자 뷰 (예시)
   return (
     <main className="p-4">
-       <PexelsGrid/> 
-      {/* <UnsplashGrid/> */}
+       {/* <PexelsGrid/>  */}
+      <UnsplashGrid/> 
       
     </main>
   );

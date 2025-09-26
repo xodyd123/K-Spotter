@@ -7,11 +7,12 @@ type UItem = {
   author?: { name?: string; profile?: string };
   creditHref?: string;
   download_location?: string;
-  intent: "sea"|"night"|"heritage"|"mountain"|"other";
+  intent: "hanok"|"nature"|"culture"|"city"
 };
 type UPage = { items: UItem[]; nextPage?: number };
 
 export function useUnsplashFeed(params: { intent: UItem["intent"]; q?: string }) {
+     
   return useInfiniteQuery<UPage, Error, InfiniteData<UPage, number>, [string, typeof params], number>({
     queryKey: ["unsplash", params],
     initialPageParam: 1,

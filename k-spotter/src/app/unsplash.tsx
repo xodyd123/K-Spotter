@@ -8,9 +8,11 @@ import { MediaCard } from "../app/mediaCard";
 export default function UnsplashGrid() {
   // intent로 무드 지정(예: 'sea' | 'night' | 'heritage' | 'mountain' | 'other')
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useUnsplashFeed({ intent: "night" });
+    useUnsplashFeed({ intent: "night" });  
+
 
   const items = data?.pages.flatMap((p: any) => p.items) ?? [];
+  console.log("items" , items); 
 
   // 무한 스크롤 sentinel
   const sentinelRef = useRef<HTMLDivElement | null>(null);
