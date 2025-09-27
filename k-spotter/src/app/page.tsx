@@ -3,8 +3,7 @@ import { COOKIE_PREF } from "@/lib/cookies";
 import { verifyPrefs } from "@/lib/prefs";
 
 import { redirect } from "next/navigation";
-import PexelsGrid from "./PexelsGrid";
-import UnsplashGrid from "./unsplash";
+import BalancedFeedUI from "./components/home/balancedFeedUI";
 
 
 export default async function Page() { 
@@ -21,7 +20,7 @@ export default async function Page() {
   return (
     <main className="p-4">
        {/* <PexelsGrid/>  */}
-      <UnsplashGrid/> 
+      <BalancedFeedUI/> 
       
     </main>
   );
