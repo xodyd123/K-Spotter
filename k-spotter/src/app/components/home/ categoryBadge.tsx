@@ -6,24 +6,40 @@ export function SkeletonCard() {
     return (
       <div className="animate-pulse overflow-hidden rounded-2xl border bg-white">
         <div className="aspect-[4/3] bg-gray-200" />
-        <div className="p-3 space-y-2">
-          <div className="h-4 w-24 bg-gray-200 rounded" />
-          <div className="h-4 w-3/4 bg-gray-200 rounded" />
-          <div className="h-3 w-1/2 bg-gray-200 rounded" />
-        </div>
       </div>
     );
   }
 
 
 
-export function Card({ p  , onSearchClick , onOpen }: { p: Photo  , onSearchClick : (title: string)  => Promise<any>  , onOpen : () => void}) {
+  import Image from "next/image";
+
+  export function Card({
+    p,
+    onSearchClick, // 안 쓰면 제거해도 됩니다
+    onOpen,
+  }: {
+    p: Photo;
+    onSearchClick: (title: string) => Promise<any>;
+    onOpen: () => void;
+  }) {
     return (
       <article className="group overflow-hidden rounded-2xl border bg-white shadow-sm">
-        <div onClick={() =>  onOpen()} className="aspect-[4/3] bg-gray-100 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={p.url} alt={p.title} className="h-full w-full object-cover group-hover:scale-[1.02] transition" />
+        <div
+          onClick={onOpen}
+          className="relative aspect-[4/3] bg-gray-100 overflow-hidden cursor-zoom-in"
+        >
+          <Image
+            src={p.url}
+            alt={p.title}
+            fill
+            className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.5]"
+            // 화면 그리드에 맞춰 적당한 사이즈 힌트 (필요 시 조정)
+            sizes="(max-width: 640px) 50vw, (max-width:1024px) 33vw, 25vw"
+            // placeholder="blur" blurDataURL="data:image/png;base64,..."  // 원하면 블러 플레이스홀더
+          />
         </div>
       </article>
     );
   }
+  
