@@ -33,6 +33,7 @@ import { waitMapIdle } from "@/utils/waitMapIdle";
 import SearchContent from "../components/search/searchContent";
 import { useQueryClient } from "@tanstack/react-query";
 import { NearbyDetailPlace } from "@/lib/mock/api/getNearbyDetailPlace";
+import { useSearchParams } from "next/navigation";
 
 declare global {
   interface Window {
@@ -118,6 +119,7 @@ export default function Page() {
     new Map()
   );
   const qc = useQueryClient();
+  const sp = useSearchParams();
 
   const openSummary = (items: Place[]) => {
     setSheet("half");
@@ -572,16 +574,32 @@ export default function Page() {
 
         const { kakao } = window;
 
-        const mk = (src: string, w = 28, h = 38) =>
-          new kakao.maps.MarkerImage(src, new kakao.maps.Size(w, h), {
-            offset: new kakao.maps.Point(w / 2, h),
-          });
+        const lat = parseFloat(sp.get("lat") ?? "37.5665" );
+        const lng = parseFloat(sp.get("lng") ?? "126.978");
+        const title = sp.get("title") ?? "선택 위치";
+
+        
+
+  
 
         // 지도 생성
         map.current = new kakao.maps.Map(mapRef.current, {
-          center: new kakao.maps.LatLng(37.5665, 126.978),
+          center: new kakao.maps.LatLng(lat, lng),
           level: 5,
-        });
+        }); 
+
+        if(lat && lng && title) {
+          const marker = new kakao.maps.Marker({
+            position: new kakao.maps.LatLng(lat, lng),
+            title: title,
+          });
+          // kakao.maps.event.addListener(marker, "click", () =>
+          //   onSelectNearby({ kind: "place", data: p })
+          // );
+          marker.setMap(map.current); // ✅ 지도에 부착
+        }
+
+
 
         // 2) (여기서 바로) 클러스터러 생성
         const Clusterer = (window.kakao.maps as any).MarkerClusterer;
@@ -602,14 +620,6 @@ export default function Page() {
         // 진단용 컨트롤(버튼으로 확대/축소가 되면 입력(휠) 경로만 문제인 상태)
         const ctrl = new kakao.maps.ZoomControl();
         map.current.addControl(ctrl, kakao.maps.ControlPosition.RIGHT);
-
-        const PIN = {
-          Movie: mk("/pins/movie.svg"),
-          Drama: mk("/pins/drama.svg"),
-          MusicVideo: mk("/pins/music.svg"),
-          selected: mk("/pins/selected.svg", 30, 42),
-        };
-        pinRef.current = PIN;
 
         allowAutoMoveUntilRef.current = Date.now() + 5000;
 
