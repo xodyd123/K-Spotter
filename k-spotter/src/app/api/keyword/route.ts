@@ -1,29 +1,80 @@
 import { buildURL } from "@/app/service/buildUrl";
-import { NextRequest, NextResponse} from "next/server";
-
+import { NextRequest, NextResponse } from "next/server";
+import path from "path";
+import fs from "fs/promises";
 
 const ENDPOINT = "https://apis.data.go.kr/B551011/KorService2/searchKeyword2";
 
-export async function GET(req: NextRequest) {  
+const FIXTURE_DIR = path.join(process.cwd(), "fixtures/tourapi");
+const FIXTURE_FILES = [
+  "coast_with_coords.json",
+  "heritage_with_coords.json",
+  "mountain_with_coords.json",
+  "urban_with_coords.json",
+];
 
-
-    const keyword = encodeURIComponent(req.nextUrl.searchParams.get("keyword") ?? "");
-    
-    const url =  buildURL({contentTypeId: "12",
-        areaCode: "1",
-        numOfRows: "20",
-        pageNo: "1",
-        arrange: "C",
-        keyword 
-    } ,  ENDPOINT)
-
+async function loadFixtureItems() {
+  const all = [];
  
-    const r = await fetch(url, { cache: "no-store" }); 
-    const raw = await r.json(); 
-    const result = raw.response?.body?.items?.item;
-    const items = Array.isArray(result) ? result : result ? [result] : [];
-    return NextResponse.json(items) ;  
+  for (const f of FIXTURE_FILES) {
+    try {
+      const txt = await fs.readFile(path.join(FIXTURE_DIR, f), "utf8");
+      
+      
+      const arr = JSON.parse(txt);
+     
+      all.push(...arr);
+    } catch {
 
+     
+      // 파일 없거나 JSON 오류는 무시하고 계속
+    }
+  }
+  return all;
+}
 
+export async function GET(req: NextRequest) {
+  const keyword = req.nextUrl.searchParams.get("keyword") ?? "";
+  const useMock = process.env.MOCK_TOURAPI === "1";
 
+  // 1) 목 모드 : 로컬 JSON에서 검색
+  if (useMock) {
+    
+    const itmes = await loadFixtureItems(); 
+    const q = (keyword ?? "").trim();
+    const filtered = 
+      itmes.filter((it: any) => (it?.title ?? "").includes(q)) // ← norm 제거
+      .slice(0, 20)
+      .map((it: any, idx: number) => ({
+        contentid: String(it.cid ?? idx + 1),
+        contenttypeid: 12,
+        title: it.title,
+        addr1: it.region ?? null,
+        mapx: it.lng ?? null, // 경도
+        mapy: it.lat ?? null, // 위도
+        firstimage: it.url ?? null,
+      }));
+  
+    return NextResponse.json(filtered, { status: 200 });
+  }
+
+  const url = buildURL(
+    {
+      contentTypeId: "12",
+      numOfRows: "20",
+      pageNo: "1",
+      arrange: "C",
+      keyword,
+    },
+    ENDPOINT
+  );
+
+  const r = await fetch(url, { cache: "no-store" });
+  const raw = await r.json();
+
+  const result = raw.response?.body?.items?.item;
+  const items = Array.isArray(result) ? result : result ? [result] : [];
+
+  console.log("items", items);
+  return NextResponse.json(items);
 }

@@ -1,6 +1,5 @@
+
 import { Photo } from "../../../../type/type";
-
-
 
 
 export function SkeletonCard() {
@@ -18,14 +17,13 @@ export function SkeletonCard() {
 
 
 
-export function Card({ p }: { p: Photo }) {
+export function Card({ p  , onSearchClick , onOpen }: { p: Photo  , onSearchClick : (title: string)  => Promise<any>  , onOpen : () => void}) {
     return (
       <article className="group overflow-hidden rounded-2xl border bg-white shadow-sm">
-        <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+        <div onClick={() =>  onOpen()} className="aspect-[4/3] bg-gray-100 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={p.url} alt={p.title} className="h-full w-full object-cover group-hover:scale-[1.02] transition" />
         </div>
-
       </article>
     );
   }
