@@ -11,14 +11,12 @@ export function MapButton({
   lng: number;
   title: string;
 }) {
-  console.log(lat);
-
   const href = {
     pathname: "/map",
     query: {
-      lat: lat.toFixed(6),
-      lng: lng.toFixed(6),
-      title,
+      lat:  33.3563 ,// lat.toFixed(6)  ,
+      lng:  126.172 ,//lng.toFixed(6),
+      title : "테스트"
     },
   };
 

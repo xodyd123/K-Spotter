@@ -24,6 +24,7 @@ export function PhotoViewer({
 }) {
   const [place, setPlace] = useState<Place | null>(null);
   const [busy, setBusy] = useState(false);
+  
 
   // body scroll lock
   useEffect(() => {
@@ -73,7 +74,7 @@ export function PhotoViewer({
     >
       {/* stop bubble */}
       <div
-        className="relative rounded-2xl h-[80%] w-[100%] max-w-[100%]  overflow-hidden  my-4 mx-4 flex flex-col justify-end"
+        className="bg-amber-200 relative rounded-2xl h-[80%] w-[100%] max-w-[100%]  overflow-hidden  my-4 mx-4 flex flex-col justify-end"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 원본비율 이미지: Next/Image */}
