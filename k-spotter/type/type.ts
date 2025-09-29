@@ -188,3 +188,14 @@ export type CastMember = {
   };
   
 
+  export type Photo = {
+    cid: string;
+    title: string;
+    author?: string;
+    url: string;
+    category: "coast" | "mountain" | "heritage" | "urban";
+    categoryLabel: string;
+    region?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+  };
