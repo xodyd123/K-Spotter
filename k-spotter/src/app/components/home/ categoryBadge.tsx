@@ -1,4 +1,5 @@
 
+import { Dispatch, SetStateAction } from "react";
 import { Photo } from "../../../../type/type";
 
 
@@ -10,23 +11,35 @@ export function SkeletonCard() {
     );
   }
 
-
-
   import Image from "next/image";
+  
 
   export function Card({
     p,
-    onSearchClick, // 안 쓰면 제거해도 됩니다
     onOpen,
+    onSearchClick ,
+    setSelected 
   }: {
     p: Photo;
-    onSearchClick: (title: string) => Promise<any>;
     onOpen: () => void;
+    onSearchClick  : (title: string) => Promise<any> ;
+    setSelected : Dispatch<SetStateAction<Photo | null>>
   }) {
+
+    const clickToggle =  async () => {
+        onOpen();
+        setSelected(p) 
+        const result = await onSearchClick(p.title) ; 
+        const newP = {...p , lat : result.lat , lng :result.lng }
+        setSelected(newP) ; 
+      
+
+    }
+
     return (
       <article className="group overflow-hidden rounded-2xl border bg-white shadow-sm">
         <div
-          onClick={onOpen}
+          onClick={clickToggle}
           className="relative aspect-[4/3] bg-gray-100 overflow-hidden cursor-zoom-in"
         >
           <Image

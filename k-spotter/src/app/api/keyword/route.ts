@@ -35,28 +35,65 @@ async function loadFixtureItems() {
 
 export async function GET(req: NextRequest) {
   const keyword = req.nextUrl.searchParams.get("keyword") ?? "";
-  const useMock = process.env.MOCK_TOURAPI === "1";
+//   const useMock = process.env.MOCK_TOURAPI === "1";
 
-  // 1) 목 모드 : 로컬 JSON에서 검색
-  if (useMock) {
+//   // 1) 목 모드 : 로컬 JSON에서 검색
+//   if (useMock) {
     
-    const itmes = await loadFixtureItems(); 
-    const q = (keyword ?? "").trim();
-    const filtered = 
-      itmes.filter((it: any) => (it?.title ?? "").includes(q)) // ← norm 제거
-      .slice(0, 20)
-      .map((it: any, idx: number) => ({
-        contentid: String(it.cid ?? idx + 1),
-        contenttypeid: 12,
-        title: it.title,
-        addr1: it.region ?? null,
-        mapx: it.lng ?? null, // 경도
-        mapy: it.lat ?? null, // 위도
-        firstimage: it.url ?? null,
-      }));
+//     const itmes = await loadFixtureItems(); 
+//     const q = (keyword ?? "").trim();
+//     const filtered = 
+//       itmes.filter((it: any) => (it?.title ?? "").includes(q)) // ← norm 제거
+//       .slice(0, 20)
+//       .map((it: any, idx: number) => ({
+//         contentid: String(it.cid ?? idx + 1),
+//         contenttypeid: 12,
+//         title: it.title,
+//         addr1: it.region ?? null,
+//         mapx: it.lng ?? null, // 경도
+//         mapy: it.lat ?? null, // 위도
+//         firstimage: it.url ?? null,
+//       }));
   
-    return NextResponse.json(filtered, { status: 200 });
-  }
+//     return NextResponse.json(filtered, { status: 200 });
+//   }  
+
+
+     const results = [];
+    // 2) Kakao Local (관광명소 AT4)
+    if ( process.env.KAKAO_REST_KEY) {
+        try {
+          const u = new URL("https://dapi.kakao.com/v2/local/search/keyword.json");
+          u.searchParams.set("query", keyword);
+          u.searchParams.set("category_group_code", "AT4"); // 관광명소
+          // u.searchParams.set("x", "126.978"); u.searchParams.set("y", "37.5665"); u.searchParams.set("radius", "20000"); // 필요 시 중심/반경 제한
+    
+          const r = await fetch(u.toString(), {
+            headers: { Authorization: `KakaoAK ${process.env.KAKAO_REST_KEY}` },
+          });
+          const raw = await r.json();
+          for (const d of raw?.documents ?? []) {
+            const lat = Number(d.y), lng = Number(d.x);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+            results.push({
+              id: d.id,
+              title: d.place_name,
+              lat, lng,
+              addr: d.road_address_name || d.address_name || null,
+              image: null, // Kakao Local은 이미지 없음
+              source: "kakao",
+            });
+          }
+        } catch (e) {
+            console.error(e.getMeessage()) ;
+         }
+         
+      }
+      console.log("result" , results) ;
+      return NextResponse.json(results); 
+
+
+     
 
   const url = buildURL(
     {

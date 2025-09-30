@@ -63,7 +63,7 @@ export default function BalancedFeedUI() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {items.map((p) => (
-          <Card key={p.cid} p={p}  onSearchClick = {onSearchClick} onOpen = {() => {
+          <Card key={p.cid} p={p} setSelected={setSelected} onSearchClick ={onSearchClick }  onOpen = {() => {
             setSelected(p)}}/>
         ))}
         {isLoading &&
