@@ -6,6 +6,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko">
       <body>
         <Providers>{children}</Providers>
+        
       </body>
     </html>
   );
